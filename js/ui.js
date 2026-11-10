@@ -2,8 +2,8 @@
 /* ============ Interface (HUD, janelas, lojas, título) ============ */
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const MENU = [['char', '🧝', 'Personagem', 'C'], ['inv', '🎒', 'Mochila', 'I'], ['skills', '✨', 'Habilidades', 'K'], ['quests', '📜', 'Missões', 'L'], ['prof', '⚒️', 'Profissões', 'P'], ['wings', '🪽', 'Asas', 'O'], ['skins', '🎭', 'Visuais', 'V'], ['map', '🗺️', 'Mapa', 'M'], ['rank', '🏆', 'Ranking', 'R'], ['cash', '💎', 'Loja', ''], ['settings', '⚙️', 'Opções', '']];
-const TITLES = { char: 'Personagem', inv: 'Mochila', skills: 'Habilidades', quests: 'Missões', prof: 'Profissões', wings: 'Asas', skins: 'Visuais', map: 'Mapa de Aetheria', rank: 'Ranking', cash: 'Loja de Cristais', settings: 'Opções', smith: 'Ferreiro Brom', alch: 'Alquimista Mirela', merchant: 'Mercador Tobias' };
+const MENU = [['char', '🧝', 'Personagem', 'C'], ['inv', '🎒', 'Mochila', 'I'], ['skills', '✨', 'Habilidades', 'K'], ['quests', '📜', 'Missões', 'L'], ['prof', '⚒️', 'Profissões', 'P'], ['wings', '🪽', 'Asas', 'O'], ['skins', '🎭', 'Visuais', 'V'], ['map', '🗺️', 'Mapa', 'M'], ['rank', '🏆', 'Ranking', 'R'], ['online', '🌐', 'Jogadores', ''], ['cash', '💎', 'Loja', ''], ['settings', '⚙️', 'Opções', '']];
+const TITLES = { char: 'Personagem', inv: 'Mochila', skills: 'Habilidades', quests: 'Missões', prof: 'Profissões', wings: 'Asas', skins: 'Visuais', map: 'Mapa de Aetheria', rank: 'Ranking', online: 'Jogadores online', cash: 'Loja de Cristais', settings: 'Opções', smith: 'Ferreiro Brom', alch: 'Alquimista Mirela', merchant: 'Mercador Tobias' };
 const WIDE = { smith: 1, cash: 1, merchant: 1 };
 
 const UI = {
@@ -11,6 +11,7 @@ const UI = {
   toast(msg, cls) { const d = document.createElement('div'); d.className = 'toast ' + (cls || ''); d.textContent = msg; const t = $('toasts'); t.appendChild(d); while (t.children.length > 4) t.firstChild.remove(); setTimeout(() => d.remove(), 3600); },
   _line(html, cls) { const l = $('chatlog'), p = document.createElement('p'); if (cls) p.className = cls; p.innerHTML = html; const stick = l.scrollTop + l.clientHeight >= l.scrollHeight - 30; l.appendChild(p); while (l.children.length > 80) l.firstChild.remove(); if (stick) l.scrollTop = l.scrollHeight; },
   log(msg, cls) { this._line(esc(msg), cls || 'sys'); },
+  note() { }, // ações do próprio jogador (loot, coleta, nível): não vão mais para o chat; já aparecem como texto flutuante/aviso
   chat(name, msg, kind, me) { if (kind) this._line('<span class="w">[Mundo] ' + esc(name) + ' ' + esc(msg) + '</span>'); else this._line('<span class="n">' + esc(name) + ':</span> ' + esc(msg), me ? 'me' : ''); if (!me && !kind && this.touch && !$('chat').classList.contains('open')) $('chatbtn').style.boxShadow = '0 0 12px #7fe0ff'; },
   zoneBanner(Z) { const b = $('banner'); b.innerHTML = '<h2>' + esc(Z.name) + '</h2><p>' + (Z.safe ? 'Zona segura' : 'Níveis ' + Z.lvl[0] + ' – ' + Z.lvl[1]) + '</p>'; b.classList.add('on'); clearTimeout(this._bt); this._bt = setTimeout(() => b.classList.remove('on'), 2600); $('zname').textContent = Z.name; },
   fade(cb) { const f = $('fade'); f.classList.add('on'); setTimeout(() => { cb(); setTimeout(() => f.classList.remove('on'), 120); }, 300); },
@@ -83,6 +84,7 @@ const UI = {
   open(id, npc) {
     this.npc = npc || null; const max = this.touch || window.innerWidth < 900 ? 1 : 2;
     this.wins = this.wins.filter(w => w !== id); this.wins.push(id); while (this.wins.length > max) this.wins.shift();
+    if (id === 'online') { this.who = null; Net.getWho().then(r => { this.who = r; this.dirty.win = 1; }); }
     if (id === 'rank') { this.rank = null; Net.getRank().then(r => { this.rank = r; this.dirty.win = 1; }); }
     $('menu').classList.remove('open'); this.sel.inv = -1; this.buildWins(); Sfx.play('ui');
   },
@@ -113,9 +115,22 @@ const UI = {
     if (it.eq) { const up = S.lvl >= it.ilvl && (it.slot !== 'weapon' || it.cls === S.cls) && eqScore(it) > eqScore(S.eq[it.slot]) && S.eq[it.slot] !== it; return '<button class="cell r' + it.r + (sel ? ' sel' : '') + '" data-act="' + act + '">' + (it.slot === 'weapon' ? CLASSES[it.cls].wIcon : SLOT_ICON[it.slot]) + (it.enh ? '<span class="e">+' + it.enh + '</span>' : '') + (up ? '<span class="up">▲</span>' : '') + '</button>'; }
     const d = ITEMS[it.id]; return '<button class="cell r' + (d.r || 0) + (sel ? ' sel' : '') + '" data-act="' + act + '">' + d.icon + '<span class="q">' + it.q + '</span></button>';
   },
+  itemValue(it) { return !it ? 0 : it.eq ? eqSell(it) : (ITEMS[it.id].sell || 0) * it.q; },
+  multiValue() { let v = 0; for (const k in this.sel.set) v += this.itemValue(S.inv[k]); return v; },
   invHTML(shop) {
+    if (!this.sel.set) this.sel.set = {};
     let h = '<div class="row small"><span class="gold">🪙 ' + fmt(S.gold) + '</span><span class="sp"></span><span class="dim">' + S.inv.filter(x => x).length + '/' + S.inv.length + ' espaços</span></div><div class="grid" style="margin-top:6px">';
+    // venda em lote: no Mercador, "Selecionar vários" troca o toque de "ver detalhes" para "marcar/desmarcar"
+    if (shop && this.sel.multi) {
+      const set = this.sel.set; for (const k in set) if (!S.inv[k]) delete set[k];
+      S.inv.forEach((it, i) => h += this.cellHTML(it, 'invmulti:' + i, false).replace('class="cell', 'class="cell' + (set[i] ? ' mk' : ''))); h += '</div>';
+      const ids = Object.keys(set), total = this.multiValue();
+      h += '<div class="detail"><p>' + (ids.length ? '<b>' + ids.length + '</b> ' + (ids.length > 1 ? 'itens marcados' : 'item marcado') + ' — <span class="gold">' + fmt(total) + ' 🪙</span>' : 'Toque nos itens que deseja vender.') + '</p><p class="dim small">Pilhas são vendidas inteiras.</p>'
+        + '<div class="row" style="margin-top:6px"><button class="btn sm gold" data-act="sellmulti"' + (ids.length ? '' : ' disabled') + '>Vender marcados</button><button class="btn sm ghost" data-act="multiall">Marcar tudo</button><button class="btn sm ghost" data-act="multinone">Limpar</button><span class="sp"></span><button class="btn sm ghost" data-act="multitoggle">Voltar</button></div></div>';
+      return h;
+    }
     S.inv.forEach((it, i) => h += this.cellHTML(it, 'invsel:' + i, this.sel.inv === i)); h += '</div>';
+    if (shop) h += '<div class="row" style="margin-top:6px"><button class="btn sm ghost" data-act="multitoggle">☑ Selecionar vários para vender</button></div>';
     const it = S.inv[this.sel.inv];
     if (it) { h += '<div class="detail">' + this.itemHTML(it, { compare: 1 }) + '<div class="row" style="margin-top:6px">'; if (it.eq) h += '<button class="btn sm" data-act="equip">Equipar</button>'; else if (ITEMS[it.id].use) h += '<button class="btn sm" data-act="useinv">Usar</button>'; if (shop) h += '<button class="btn sm gold" data-act="sell:0">Vender</button>' + (!it.eq && it.q > 1 ? '<button class="btn sm gold" data-act="sell:1">Vender tudo</button>' : ''); h += '<span class="sp"></span><button class="btn sm red" data-act="drop">Descartar</button></div></div>'; }
     else h += '<p class="dim small c">Toque em um item para ver os detalhes.' + (shop ? '' : ' Para vender, visite o Mercador Tobias na vila.') + '</p>';
@@ -189,6 +204,14 @@ const UI = {
       for (const Z of ZONES) { const disc = S.disc[Z.id], here = G.world.id === Z.id, cost = Z.id === 0 ? 0 : 20 + Z.id * 45, bq = Z.boss ? S.quests.done['q' + Z.id + '_4'] : 0; h += '<div class="li" style="' + (disc ? '' : 'opacity:.55') + '"><div class="ic">' + (Z.safe ? '🏠' : bq ? '👑' : disc ? '🗺️' : '❔') + '</div><div class="tx"><b>' + esc(Z.name) + (here ? ' <span class="good small">(você está aqui)</span>' : '') + '</b><span>' + (Z.safe ? 'Zona segura · NPCs e lojas' : 'Níveis ' + Z.lvl[0] + '–' + Z.lvl[1] + ' · Chefe: ' + MOBS[Z.boss].name) + '</span></div>' + (at && disc && !here ? '<button class="btn sm" data-act="tp:' + Z.id + '">' + (cost ? cost + ' 🪙' : 'Grátis') + '</button>' : !disc ? '<span class="dim small">Não descoberta</span>' : '') + '</div>'; }
       return h;
     },
+    online() {
+      let h = '<p class="dim small">' + (Net.mode === 'ws' ? 'Todos os jogadores conectados agora.' : 'Fora do servidor próprio só é possível ver quem está na sua zona.') + ' <button class="btn sm ghost" data-act="whorefresh">Atualizar</button></p>';
+      if (!this.who) return h + '<p class="c dim">Carregando…</p>';
+      if (!this.who.length) return h + '<p class="c dim">Ninguém além de você por aqui.</p>';
+      h += '<p class="small"><b class="good">' + this.who.length + '</b> online</p>';
+      this.who.forEach(r => { const me = r.id === Net.wsId, canInv = Net.mode === 'ws' && !me && !r.g && (!Net.inParty() || Net.party.leader === Net.wsId); h += '<div class="li" style="' + (me ? 'border-color:var(--gold)' : '') + '"><div class="ic">' + CLASSES[r.c].icon + '</div><div class="tx"><b>' + esc(r.n) + (r.g ? ' <span class="dim small">👥</span>' : '') + '</b><span>Nível ' + r.l + ' · ' + esc(ZONES[r.z] ? ZONES[r.z].name : '—') + '</span></div>' + (canInv ? '<button class="btn sm" data-act="partyinvite:' + esc(r.id) + '">Convidar</button>' : '') + '</div>'; });
+      return h;
+    },
     rank() {
       let h = '<p class="dim small">' + (Net.mode === 'claude' || Net.mode === 'ws' ? 'Jogadores online agora: <b class="good">' + Net.online + '</b>' : 'Você está offline — o ranking mostra apenas dados locais.') + '</p>';
       if (!this.rank) return h + '<p class="c dim">Carregando…</p>';
@@ -245,7 +268,22 @@ const UI = {
   /* ---------- Ações ---------- */
   acts: {
     toggle(id) { UI.toggle(id); }, close(id) { UI.close(id); }, closeModal() { UI.closeModal(); },
-    tab(k, v) { UI.tab[k] = v; UI.sel.inv = -1; UI.dirty.win = 1; },
+    tab(k, v) { UI.tab[k] = v; UI.sel.inv = -1; UI.sel.multi = false; UI.sel.set = {}; UI.dirty.win = 1; },
+    multitoggle() { UI.sel.multi = !UI.sel.multi; UI.sel.set = {}; UI.sel.inv = -1; UI.dirty.win = 1; },
+    invmulti(i) { if (!S.inv[+i]) return; if (UI.sel.set[+i]) delete UI.sel.set[+i]; else UI.sel.set[+i] = 1; UI.dirty.win = 1; },
+    multiall() { UI.sel.set = {}; S.inv.forEach((it, i) => { if (it && !it.lock) UI.sel.set[i] = 1; }); UI.dirty.win = 1; },
+    multinone() { UI.sel.set = {}; UI.dirty.win = 1; },
+    sellmulti() {
+      const ids = Object.keys(UI.sel.set).filter(k => S.inv[k]); if (!ids.length) return;
+      const rare = ids.filter(k => { const it = S.inv[k]; return it.eq && (it.r >= 3 || it.enh > 0); }).length;
+      UI.modal('<h2>Vender ' + ids.length + (ids.length > 1 ? ' itens' : ' item') + '?</h2><p>Você receberá <span class="gold">' + fmt(UI.multiValue()) + ' 🪙</span>.</p>' + (rare ? '<p class="bad">Atenção: ' + rare + (rare > 1 ? ' são equipamentos Épicos/Lendários ou reforçados.' : ' é um equipamento Épico/Lendário ou reforçado.') + '</p>' : '') + '<div class="row"><button class="btn gold" data-act="sellmultiyes">Vender</button><button class="btn ghost" data-act="closeModal">Cancelar</button></div>');
+    },
+    sellmultiyes() {
+      let g = 0, n = 0; for (const k in UI.sel.set) { const it = S.inv[k]; if (!it) continue; g += UI.itemValue(it); S.inv[k] = null; n++; }
+      UI.sel.set = {}; UI.closeModal(); if (n) { gainGold(g); UI.toast('Vendeu ' + n + (n > 1 ? ' itens' : ' item') + ' por ' + fmt(g) + ' ouro.', 'good'); Sfx.play('coin'); } UI.dirty.all = 1;
+    },
+    partyaccept() { UI.closeModal(); Net.partySend('accept'); }, partydecline() { UI.closeModal(); Net.partySend('decline'); }, partyleave() { Net.partySend('leave'); },
+    partyinvite(id) { UI.closeModal(); Net.partySend('invite', { id }); }, whorefresh() { UI.who = null; UI.dirty.win = 1; Net.getWho().then(r => { UI.who = r; UI.dirty.win = 1; }); },
     invsel(i) { UI.sel.inv = UI.sel.inv === +i ? -1 : +i; UI.dirty.win = 1; }, eqsel(s) { UI.sel.eq = UI.sel.eq === s ? null : s; UI.dirty.win = 1; },
     equip() { equipInv(UI.sel.inv); UI.sel.inv = -1; }, unequip(s) { unequip(s); UI.sel.eq = null; },
     useinv() { const it = S.inv[UI.sel.inv]; if (it && !it.eq) useItemId(it.id); UI.dirty.win = 1; },

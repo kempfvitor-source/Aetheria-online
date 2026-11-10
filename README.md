@@ -24,6 +24,23 @@ ranking e save na nuvem (pasta `saves/`). Use HTTPS/WSS em produção (proxy ngi
 - `js/ui.js`, `js/main.js` — janelas, HUD, entrada, laço principal
 - `server.js` — servidor HTTP + WebSocket
 
+## Gráficos 3D (Blender)
+
+A pasta `img/` guarda sprites renderizados no Blender (fundo transparente, olhando para a direita).
+Hoje cobrem: Guerreiro, monstros e chefes das zonas 1 e 2, e árvores/rochas da Vila e das zonas 1 e 2.
+O que não tem sprite continua com a arte procedural. Para adicionar um monstro: salve `img/mob_<id>.png`
+e registre a altura em `SPR3D_MOB` (js/render.js).
+
+## Grupo (só no servidor próprio)
+
+Até 4 jogadores. Toque em um jogador, use a janela 🌐 Jogadores, ou no chat:
+
+    /grupo convidar <jogador>   /grupo aceitar   /grupo recusar   /grupo sair
+
+Para quem está na mesma zona: XP e ouro de cada monstro ganham +20% por companheiro e são divididos
+igualmente; materiais vão para todos; cada equipamento é sorteado entre os membros; abates contam
+nas missões de todos.
+
 ## Loja de cash
 
 Está desativada (`CASH_ENABLED = false` em `js/data.js`) e exibida como "EM BREVE".

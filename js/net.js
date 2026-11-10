@@ -49,7 +49,7 @@ const Net = {
     for (const id of [...G.peers.keys()]) if (!seen.has(id)) G.peers.delete(id);
   },
   async setZone(id) {
-    this.zone = id; this.lastState = ''; this.lobbySync(); const token = ++this.ztoken;
+    this.zone = id; this.lastState = ''; this.lobbySync(); this.partyHud(); const token = ++this.ztoken;
     if (this.mode === 'claude' && this.lobby) {
       try {
         if (this.zunsub) { this.zunsub(); this.zunsub = null; } const old = this.zroom; this.zroom = null; if (old) await old.leave().catch(() => { });
@@ -96,6 +96,14 @@ const Net = {
     if (S && !rows.some(r => r.id === this.uid || (r.n === S.name && r.l === S.lvl))) rows.push({ id: 'me', n: S.name, c: S.cls, l: S.lvl, xp: S.xp, p: P.st.power | 0, w: S.wings.t });
     rows.sort((a, b) => b.l - a.l || b.xp - a.xp || b.p - a.p); return rows.slice(0, 50);
   },
+  // lista de jogadores online (servidor próprio: todos; demais modos: só quem está na sua zona)
+  async getWho() {
+    let rows = [];
+    if (this.ws && this.ws.readyState === 1) rows = await new Promise(res => { this._whoRes = res; this.ws.send(JSON.stringify({ t: 'who' })); setTimeout(() => res([]), 3000); });
+    else { if (S) rows.push({ id: this.wsId || 'me', n: S.name, c: S.cls, l: S.lvl, z: this.zone }); for (const [id, p] of G.peers) rows.push({ id, n: p.n, c: p.c, l: p.l, z: this.zone }); }
+    rows = rows.filter(r => r && typeof r.n === 'string' && typeof r.id === 'string').slice(0, 200).map(r => ({ id: r.id.slice(0, 40), n: r.n.slice(0, 16), c: CLASSES[r.c] ? r.c : 'warrior', l: Math.max(1, Math.min(MAX_LEVEL, r.l | 0)), z: r.z | 0, g: r.g ? 1 : 0 }));
+    rows.sort((a, b) => (b.id === this.wsId) - (a.id === this.wsId) || b.l - a.l || a.n.localeCompare(b.n)); return rows;
+  },
   /* ---- telemetria para o painel ADM (só no servidor próprio) ---- */
   evq: [],
   track(e, d) {
@@ -114,6 +122,43 @@ const Net = {
     const d = document.createElement('div'); d.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(8,6,20,.92);color:#fff;font:600 18px/1.5 sans-serif;text-align:center;padding:24px';
     d.innerHTML = '<div style="max-width:420px"><div style="font-size:42px">⚠️</div><p></p><button style="margin-top:14px;padding:10px 22px;border:0;border-radius:8px;background:#7a4fd0;color:#fff;font:inherit;cursor:pointer">Recarregar</button></div>';
     d.querySelector('p').textContent = msg || 'Você foi desconectado.'; d.querySelector('button').onclick = () => location.reload(); document.body.appendChild(d);
+  },
+  /* ---- grupo (party): só no servidor próprio ---- */
+  party: { members: [], leader: null },
+  inParty() { return this.party.members.length > 1; },
+  // companheiros de grupo na mesma zona (são eles que dividem XP, ouro e itens)
+  partyMates() { return this.inParty() ? this.party.members.filter(m => m.id !== this.wsId && m.z === this.zone) : []; },
+  partySend(a, extra) {
+    if (!this.ws || this.ws.readyState !== 1) { UI.log('Grupos só funcionam conectado ao servidor do jogo.', 'sys'); return; }
+    this.ws.send(JSON.stringify(Object.assign({ t: 'party', a }, extra || {})));
+  },
+  pshare(o) { if (this.ws && this.ws.readyState === 1 && this.partyMates().length) this.ws.send(JSON.stringify(Object.assign({ t: 'pshare' }, o))); },
+  _party(m) {
+    if (m.a === 'msg') { UI.log('👥 ' + String(m.m || '').slice(0, 160), 'sys'); return; }
+    if (m.a === 'invited') {
+      const from = String(m.from || '?').slice(0, 16); UI.log('👥 ' + from + ' convidou você para um grupo. Use os botões ou /grupo aceitar.', 'r4'); Sfx.play('quest');
+      UI.modal('<h2>Convite de grupo</h2><p><b>' + esc(from) + '</b> quer formar um grupo com você.</p><p class="dim small">No grupo, XP, ouro e materiais dos monstros são divididos entre quem estiver na mesma zona.</p><div class="row"><button class="btn gold" data-act="partyaccept">Aceitar</button><button class="btn ghost" data-act="partydecline">Recusar</button></div>'); return;
+    }
+    if (m.a === 'state') {
+      const list = Array.isArray(m.members) ? m.members.slice(0, 8).filter(x => x && typeof x.id === 'string').map(x => ({ id: x.id, n: String(x.n || '?').slice(0, 16), l: Math.max(1, Math.min(MAX_LEVEL, x.l | 0)), z: x.z | 0 })) : [];
+      this.party = { members: list.length > 1 ? list : [], leader: typeof m.leader === 'string' ? m.leader : null }; if (m.m) UI.log('👥 ' + String(m.m).slice(0, 160), 'sys'); this.partyHud();
+    }
+  },
+  partyHud() {
+    const el = document.getElementById('party'); if (!el) return; const P_ = this.party;
+    if (!this.inParty()) { el.innerHTML = ''; el.classList.add('hidden'); return; }
+    el.classList.remove('hidden');
+    el.innerHTML = '<h4>👥 Grupo</h4>' + P_.members.map(m => { const here = m.z === this.zone, me = m.id === this.wsId; return '<div class="' + (here ? '' : 'far') + '">' + (m.id === P_.leader ? '👑 ' : '') + '<b>' + esc(m.n) + '</b> <span class="dim">Nv.' + m.l + (me ? '' : here ? '' : ' · ' + esc(ZONES[m.z] ? ZONES[m.z].name : '?')) + '</span></div>'; }).join('') + '<button class="btn sm ghost" data-act="partyleave">Sair</button>';
+  },
+  // partilha recebida de um companheiro que derrotou um monstro
+  _pshare(m) {
+    if (!S || !G.started || !this.inParty()) return;
+    const xp = Math.max(0, Math.min(500000, m.xp | 0)), gold = Math.max(0, Math.min(200000, m.gold | 0));
+    if (xp) gainXp(xp); if (gold) { gainGold(gold); fxText(P.x, P.y - 58, '+' + gold + ' 🪙', '#ffd24a'); }
+    if (Array.isArray(m.items)) for (const it of m.items.slice(0, 6)) if (Array.isArray(it) && ITEMS[it[0]] && addItem(it[0], Math.max(1, Math.min(20, it[1] | 0)))) UI.note('👥 Grupo: obteve ' + ITEMS[it[0]].name + '.', 'loot');
+    if (Array.isArray(m.eq)) for (const e of m.eq.slice(0, 3)) if (e && e.to === this.wsId) { const eq = genEquip(Math.max(1, Math.min(MAX_LEVEL, e.l | 0)), { bonus: Math.max(0, Math.min(0.6, +e.b || 0)), minR: Math.max(0, Math.min(2, e.r | 0)) }); if (addEquip(eq)) { UI.note('👥 Grupo: você ganhou [' + RARITY[eq.r].n + '] ' + eq.name + ' no sorteio.', 'r' + eq.r); UI.toast('👥 Sorteio do grupo: ' + eq.name, eq.r >= 3 ? 'gold' : 'good'); if (eq.r >= 3) Sfx.play('rare'); } }
+    if (typeof m.mob === 'string' && MOBS[m.mob]) questEvent('kill', m.mob);
+    UI.dirty.hud = 1;
   },
   /* ---- skins: concessão por ADM ---- */
   isAdmin: false, gunsub: null, gname: null,
@@ -144,6 +189,9 @@ const Net = {
         else if (m.t === 'peers') { if (m.z === this.zone && Array.isArray(m.list)) this._applyPeers(m.list.filter(p => p[0] !== this.wsId)); this.online = m.on | 0 || 1; UI.netStatus(); }
         else if (m.t === 'chat' && m.id !== this.wsId) this._recv(m.id, String(m.n || '?').slice(0, 16), String(m.m || '').slice(0, 140), m.k | 0);
         else if (m.t === 'skins') applyGrants(m.skins);
+        else if (m.t === 'who' && this._whoRes) { this._whoRes(Array.isArray(m.list) ? m.list : []); this._whoRes = null; }
+        else if (m.t === 'party') this._party(m);
+        else if (m.t === 'pshare') this._pshare(m);
         else if (m.t === 'admmsg') { const t = String(m.m || '').slice(0, 200); UI.log((m.kind === 'pm' ? '🛡️ ADM (privado): ' : '📢 ADM: ') + t, 'r4'); UI.toast((m.kind === 'pm' ? '🛡️ ' : '📢 ') + t, 'gold'); }
         else if (m.t === 'admcmd') this._admCmd(m);
         else if (m.t === 'kicked') this._kicked(String(m.m || '').slice(0, 220));
@@ -151,7 +199,7 @@ const Net = {
         else if (m.t === 'granted') UI.log(m.ok ? 'Skin ' + (m.on ? 'concedida a ' : 'removida de ') + m.name + '.' : 'Não foi possível: ' + (m.err || 'sem permissão') + '.', 'sys');
         else if (m.t === 'rank' && this._rankRes) { this._rankRes(Array.isArray(m.list) ? m.list : []); this._rankRes = null; }
       };
-      ws.onclose = () => { if (this.kicked) { this.ws = null; this.mode = 'offline'; return; } if (this.ws === ws) { this.ws = null; this.mode = 'offline'; G.peers.clear(); UI.netStatus(); setTimeout(() => this._wsConnect().then(() => { if (this.ws) { this.lastState = ''; this.isAdmin = false; UI.netStatus(); } }), 4000); } };
+      ws.onclose = () => { if (this.kicked) { this.ws = null; this.mode = 'offline'; return; } if (this.ws === ws) { this.ws = null; this.mode = 'offline'; G.peers.clear(); this.party = { members: [], leader: null }; this.partyHud(); UI.netStatus(); setTimeout(() => this._wsConnect().then(() => { if (this.ws) { this.lastState = ''; this.isAdmin = false; UI.netStatus(); } }), 4000); } };
       ws.onerror = () => { };
     });
   },

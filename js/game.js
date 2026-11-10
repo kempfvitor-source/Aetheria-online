@@ -123,23 +123,30 @@ function hitMob(m, mul, o) {
 function killMob(m) {
   m.dead = true; m.respawnAt = G.time + (m.def.boss ? 240 : m.elite ? 45 : 14); fxBurst(m.x, m.y - 14, m.def.c, 16, 150); if (m.def.boss) { RD.shake = 14; fxRing(m.x, m.y, 160, '#ffd24a', 0.8); }
   const diff = S.lvl - m.lvl; let xm = diff >= 10 ? 0.1 : diff >= 7 ? 0.35 : diff >= 5 ? 0.7 : 1; if (m.def.boss) xm = Math.max(xm, 0.5);
-  gainXp(Math.max(1, Math.round(m.xp * xm))); const gold = Math.round(m.gold * rnd(0.7, 1.3)); gainGold(gold); fxText(m.x, m.y - 6, '+' + gold + ' 🪙', '#ffd24a');
+  // grupo: com N companheiros na mesma zona, XP e ouro ganham +20% por companheiro e são divididos igualmente
+  const mates = Net.partyMates(), pk = mates.length, share = pk ? { mob: m.def.id, items: [], eq: [] } : null;
+  let xpv = Math.max(1, Math.round(m.xp * xm)), gold = Math.round(m.gold * rnd(0.7, 1.3));
+  if (pk) { xpv = Math.max(1, Math.round(m.xp * (1 + 0.2 * pk) / (pk + 1))); gold = Math.max(1, Math.round(gold * (1 + 0.2 * pk) / (pk + 1))); share.xp = xpv; share.gold = gold; xpv = Math.max(1, Math.round(xpv * xm)); }
+  gainXp(xpv); gainGold(gold); fxText(m.x, m.y - 6, '+' + gold + ' 🪙', '#ffd24a');
   S.stats.kills++; if (m.def.boss) { S.stats.bosses++; Net.track('boss', { m: m.def.id }); UI.toast('Chefe derrotado: ' + m.def.name + '!', 'gold'); Net.announce('derrotou ' + m.def.name + '!'); }
-  dropLoot(m); questEvent('kill', m.def.id);
+  dropLoot(m, share, mates); questEvent('kill', m.def.id); if (share) Net.pshare(share);
   if (P.target === m) { P.target = null; if (P.engage) { const n = nearestMob(260, x => x.state === 'chase'); if (n) P.target = n; else P.engage = false; } }
 }
-function dropLoot(m) {
+// share/mates: quando em grupo, materiais vão para todos na zona e cada equipamento é sorteado entre os membros
+function dropLoot(m, share, mates) {
   const b = m.def.boss, e = m.elite, drops = [];
   if (b || Math.random() < 0.3) drops.push(['m_' + m.def.id, b ? 3 : 1]);
   if (b || Math.random() < (e ? 0.2 : 0.025)) drops.push(['stone', b ? rint(1, 2) : 1]);
   if (b || Math.random() < (e ? 0.18 : 0.015)) drops.push(['feather', b ? rint(3, 5) : 1]);
   if (Math.random() < 0.06) { const t = Math.max(1, POT_LVL.filter((l, i) => i > 0 && m.lvl >= l).length); drops.push([(Math.random() < 0.6 ? 'hp' : 'mp') + t, 1]); }
-  let dy = 22;
-  for (const [id, q] of drops) if (addItem(id, q)) { fxText(m.x, m.y - dy, ITEMS[id].icon + ' ' + ITEMS[id].name + (q > 1 ? ' x' + q : ''), RARITY[ITEMS[id].r || 0].c); dy += 16; UI.log('Obteve ' + ITEMS[id].name + (q > 1 ? ' x' + q : '') + '.', 'loot'); }
+  let dy = 22; if (share) share.items = drops.slice(0, 6);
+  for (const [id, q] of drops) if (addItem(id, q)) { fxText(m.x, m.y - dy, ITEMS[id].icon + ' ' + ITEMS[id].name + (q > 1 ? ' x' + q : ''), RARITY[ITEMS[id].r || 0].c); dy += 16; UI.note('Obteve ' + ITEMS[id].name + (q > 1 ? ' x' + q : '') + '.', 'loot'); }
   const n = b ? 2 : (Math.random() < (e ? 0.4 : 0.05) ? 1 : 0);
   for (let i = 0; i < n; i++) {
-    const eq = genEquip(m.lvl, { bonus: b ? 0.3 : e ? 0.12 : 0, minR: b && i === 0 ? 2 : 0 });
-    if (addEquip(eq)) { fxText(m.x, m.y - dy, SLOT_ICON[eq.slot] + ' ' + eq.name, RARITY[eq.r].c, eq.r >= 3); dy += 18; UI.log('Obteve [' + RARITY[eq.r].n + '] ' + eq.name + '.', 'r' + eq.r); if (eq.r >= 3) { Sfx.play('rare'); fxPillar(m.x, m.y, RARITY[eq.r].c); if (eq.r >= 4) Net.announce('encontrou o item Lendário ' + eq.name + '!'); } }
+    const eo = { bonus: b ? 0.3 : e ? 0.12 : 0, minR: b && i === 0 ? 2 : 0 };
+    if (share) { const w = Math.floor(Math.random() * (mates.length + 1)); if (w > 0) { const mt = mates[w - 1]; share.eq.push({ to: mt.id, l: m.lvl, b: eo.bonus, r: eo.minR }); UI.note('👥 Sorteio do grupo: ' + mt.n + ' ficou com o equipamento.', 'sys'); continue; } }
+    const eq = genEquip(m.lvl, eo);
+    if (addEquip(eq)) { fxText(m.x, m.y - dy, SLOT_ICON[eq.slot] + ' ' + eq.name, RARITY[eq.r].c, eq.r >= 3); dy += 18; UI.note('Obteve [' + RARITY[eq.r].n + '] ' + eq.name + '.', 'r' + eq.r); if (eq.r >= 3) { Sfx.play('rare'); fxPillar(m.x, m.y, RARITY[eq.r].c); if (eq.r >= 4) Net.announce('encontrou o item Lendário ' + eq.name + '!'); } }
   }
 }
 function gainXp(n) {
@@ -149,7 +156,7 @@ function gainXp(n) {
     for (const sk of CLASSES[S.cls].skills) if (S.lvl >= sk.lvl && !S.skills[sk.id]) { S.skills[sk.id] = 1; UI.toast('Nova habilidade: ' + sk.name + '!', 'gold'); }
     recalc(); P.hp = P.st.maxHp; P.mp = P.st.maxMp; fxPillar(P.x, P.y, '#ffd24a'); fxRing(P.x, P.y, 120, '#ffd24a', 0.8); Sfx.play('level');
     Net.track('lvl', { l: S.lvl });
-    UI.toast('Nível ' + S.lvl + '! +4 pontos de atributo, +1 ponto de habilidade.', 'gold'); UI.log('Você alcançou o nível ' + S.lvl + '!', 'sys');
+    UI.toast('Nível ' + S.lvl + '! +4 pontos de atributo, +1 ponto de habilidade.', 'gold'); UI.note('Você alcançou o nível ' + S.lvl + '!', 'sys');
     if (S.lvl === WING_UNLOCK_LVL) UI.toast('A Guardiã Seraphine quer falar com você sobre suas Asas.', 'gold');
     if (S.lvl % 10 === 0) Net.announce('alcançou o nível ' + S.lvl + '!');
     refreshQuestMark(); saveAll(true); Net.pushRank();
@@ -265,16 +272,20 @@ function interact(t) {
   if (t.type === 'portal') usePortal(t.o); else if (t.type === 'npc') { UI.openNpc(t.o.key); Sfx.play('ui'); } else if (t.type === 'node') startGather(t.o);
 }
 const NODE_PROF = { ore: 'mining', wood: 'logging', herb: 'herbalism' };
+// XP de profissão por coleta: cresce com o tier para acompanhar profNeed().
+// Com isso, liberar o tier seguinte leva ~40 coletas no tier 1 e ~65-75 nos demais (antes: ~300 e ~950+).
+function gatherXp(tier) { return 45 * tier * tier + 60 * tier; }
+const NODE_RESPAWN = 50; // segundos até o ponto de coleta voltar (antes: 80)
 function startGather(n) {
   if (P.cast) return; const pk = NODE_PROF[n.kind], pr = S.prof[pk];
   if (pr.l < tierReq(n.tier)) { UI.toast(PROFS[pk].name + ' nível ' + tierReq(n.tier) + ' necessário (você: ' + pr.l + ').', 'bad'); return; }
   P.cast = { t: 0, dur: Math.max(1.4, 2.8 - pr.l * 0.025), node: n, pk }; P.moveTo = null; P.engage = false;
 }
 function finishGather(c) {
-  const n = c.node, pr = S.prof[c.pk]; if (G.time < n.readyAt) return; n.readyAt = G.time + 80;
+  const n = c.node, pr = S.prof[c.pk]; if (G.time < n.readyAt) return; n.readyAt = G.time + NODE_RESPAWN;
   const q = 1 + (Math.random() < 0.35 + pr.l * 0.012 ? 1 : 0) + (Math.random() < pr.l * 0.008 ? 1 : 0), id = n.kind + n.tier;
-  if (addItem(id, q)) { fxText(n.x, n.y - 30, ITEMS[id].icon + ' +' + q + ' ' + ITEMS[id].name, '#d8ffd0'); UI.log('Coletou ' + ITEMS[id].name + ' x' + q + '.', 'loot'); }
-  gainProf(c.pk, 8 + n.tier * 6); S.stats.gathers += q; for (let i = 0; i < q; i++) questEvent('gather', n.tier); gainXp(Math.round(4 + MOBS[ZONES[n.tier].mobs[0]].lvl * 2.2)); Sfx.play('gather');
+  if (addItem(id, q)) { fxText(n.x, n.y - 30, ITEMS[id].icon + ' +' + q + ' ' + ITEMS[id].name, '#d8ffd0'); UI.note('Coletou ' + ITEMS[id].name + ' x' + q + '.', 'loot'); }
+  gainProf(c.pk, gatherXp(n.tier)); S.stats.gathers += q; for (let i = 0; i < q; i++) questEvent('gather', n.tier); gainXp(Math.round(4 + MOBS[ZONES[n.tier].mobs[0]].lvl * 2.2)); Sfx.play('gather');
   if (Math.random() < 0.03) { addItem('feather', 1); fxText(n.x, n.y - 46, '🪶 Pena Etérea!', RARITY[3].c, true); }
 }
 function gainProf(k, xp) { const pr = S.prof[k]; if (pr.l >= PROF_MAX) return; pr.xp += xp; while (pr.l < PROF_MAX && pr.xp >= profNeed(pr.l)) { pr.xp -= profNeed(pr.l); pr.l++; UI.toast(PROFS[k].name + ' subiu para o nível ' + pr.l + '!', 'gold'); } UI.dirty.prof = 1; }
@@ -464,10 +475,17 @@ function equipSkin(id) { if (id && !S.skins[id]) return; S.skin = id || null; Ne
 function runCommand(text) {
   const a = text.trim().split(/\s+/), cmd = a[0].toLowerCase();
   if (cmd === '/adm') { if (Net.mode === 'ws') Net.admLogin(a[1] || ''); else UI.log(Net.isAdmin ? 'Você é ADM (dono/editor desta página).' : 'Você não é ADM aqui.', 'sys'); return; }
+  if (cmd === '/grupo' || cmd === '/g' || cmd === '/party') {
+    const sub = (a[1] || '').toLowerCase(), nm = a.slice(2).join(' ');
+    if (sub === 'convidar' || sub === 'invite') { if (!nm) UI.log('Uso: /grupo convidar <jogador>', 'sys'); else Net.partySend('invite', { name: nm }); }
+    else if (sub === 'aceitar') Net.partySend('accept'); else if (sub === 'recusar') Net.partySend('decline'); else if (sub === 'sair') Net.partySend('leave');
+    else UI.log(Net.inParty() ? '👥 Grupo: ' + Net.party.members.map(m => m.n + ' (Nv.' + m.l + ')').join(', ') + '. /grupo sair para deixar.' : 'Grupo (até 4): /grupo convidar <jogador> · /grupo aceitar · /grupo recusar · /grupo sair. Também dá para tocar em um jogador para convidar.', 'sys');
+    return;
+  }
   if (cmd === '/skin') {
     const sub = (a[1] || '').toLowerCase();
     if (sub === 'lista' || !sub) { UI.log('Skins: ' + Object.keys(SKINS).map(k => k + ' (' + SKINS[k].name + ')').join(', ') + '. Uso: /skin dar <jogador> <skin> · /skin tirar <jogador> <skin>', 'sys'); return; }
     if (sub === 'dar' || sub === 'tirar') { const skin = (a[a.length - 1] || '').toLowerCase(), name = a.slice(2, -1).join(' '); if (a.length < 4 || !SKINS[skin] || !name) { UI.log('Uso: /skin ' + sub + ' <jogador> <' + Object.keys(SKINS).join('|') + '>', 'sys'); return; } Net.grant(name, skin, sub === 'dar'); return; }
   }
-  UI.log('Comando desconhecido. Comandos: /skin lista · /skin dar · /skin tirar · /adm', 'sys');
+  UI.log('Comando desconhecido. Comandos: /grupo · /skin lista · /skin dar · /skin tirar · /adm', 'sys');
 }

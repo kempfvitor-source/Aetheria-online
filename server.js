@@ -261,9 +261,52 @@ server.on('upgrade', (req, sock) => {
     }
   });
   let gone = false;
-  const bye = () => { if (gone) return; gone = true; clients.delete(c); if (c.p) endSession(c); if (![...clients].some(o => o.p)) setTimeout(() => { if (![...clients].some(o => o.p)) sync(false); }, 4000); };
+  const bye = () => { if (gone) return; gone = true; clients.delete(c); pLeave(c, true); if (c.p) endSession(c); if (![...clients].some(o => o.p)) setTimeout(() => { if (![...clients].some(o => o.p)) sync(false); }, 4000); };
   sock.on('close', bye); sock.on('error', bye); sock.on('end', bye);
 });
+
+/* ============================ Grupos (party) ============================
+   Até 4 jogadores. O servidor só guarda quem está em qual grupo e repassa a "partilha" de cada
+   monstro derrotado (XP, ouro, materiais e sorteio de equipamento) aos membros na MESMA zona. */
+const PARTY_MAX = 4; let partySeq = 1;
+const pMsg = (c, m) => wsSend(c.sock, { t: 'party', a: 'msg', m });
+function pState(p) { const members = [...p.m].map(o => ({ id: o.pid, n: o.s ? o.s.n : '?', l: o.s ? o.s.l : 1, z: o.zone })); for (const o of p.m) wsSend(o.sock, { t: 'party', a: 'state', leader: p.leader, members }); }
+function pLeave(c, quiet) {
+  const p = c.party; if (!p) return; p.m.delete(c); c.party = null; if (!quiet) wsSend(c.sock, { t: 'party', a: 'state', members: [], m: 'Você saiu do grupo.' });
+  const name = c.s ? c.s.n : 'Um jogador';
+  if (p.m.size < 2) { for (const o of p.m) { o.party = null; wsSend(o.sock, { t: 'party', a: 'state', members: [], m: name + ' saiu. O grupo foi desfeito.' }); } p.m.clear(); }
+  else { if (p.leader === c.pid) p.leader = [...p.m][0].pid; for (const o of p.m) pMsg(o, name + ' saiu do grupo.'); pState(p); }
+}
+function onParty(c, m) {
+  const t = now(); if (t - (c.pT || 0) < 400) return; c.pT = t; if (!c.s) return;
+  if (m.a === 'invite') {
+    const nm = typeof m.name === 'string' ? m.name.trim().toLowerCase().slice(0, 16) : '';
+    const o = [...clients].find(x => x !== c && x.s && x.pid !== c.pid && ((typeof m.id === 'string' && x.pid === m.id) || (nm && x.s.n.toLowerCase() === nm)));
+    if (!o) return pMsg(c, 'Jogador não encontrado ou offline.');
+    if (o.party) return pMsg(c, o.s.n + ' já está em um grupo.');
+    if (c.party && c.party.leader !== c.pid) return pMsg(c, 'Só o líder pode convidar.');
+    if (c.party && c.party.m.size >= PARTY_MAX) return pMsg(c, 'O grupo está cheio (máx. ' + PARTY_MAX + ').');
+    if (o.pinv && o.pinv.from === c.pid && t - o.pinv.ts < 15000) return pMsg(c, 'Convite já enviado. Aguarde a resposta.');
+    o.pinv = { from: c.pid, ts: t }; wsSend(o.sock, { t: 'party', a: 'invited', from: c.s.n, id: c.pid }); return pMsg(c, 'Convite enviado para ' + o.s.n + '.');
+  }
+  if (m.a === 'accept' || m.a === 'decline') {
+    const inv = c.pinv; c.pinv = null; if (!inv || t - inv.ts > 60000) return pMsg(c, 'Nenhum convite pendente.');
+    const o = [...clients].find(x => x.pid === inv.from && x.s); if (!o) return pMsg(c, 'Quem convidou não está mais online.');
+    if (m.a === 'decline') return pMsg(o, c.s.n + ' recusou o convite.');
+    if (c.party) return pMsg(c, 'Saia do grupo atual antes de aceitar outro.');
+    let p = o.party; if (!p) { p = o.party = { id: partySeq++, leader: o.pid, m: new Set([o]) }; }
+    if (p.m.size >= PARTY_MAX) return pMsg(c, 'O grupo está cheio.');
+    p.m.add(c); c.party = p; for (const x of p.m) pMsg(x, c.s.n + ' entrou no grupo.'); return pState(p);
+  }
+  if (m.a === 'leave') return c.party ? pLeave(c) : pMsg(c, 'Você não está em um grupo.');
+}
+function onPartyShare(c, m) {
+  const p = c.party; if (!p || !c.s) return; const t = now(); if (t - (c.psT || 0) > 10000) { c.psT = t; c.psN = 0; } if (++c.psN > 60) return;
+  const out = { t: 'pshare', from: c.s.n, xp: Math.max(0, Math.min(500000, m.xp | 0)), gold: Math.max(0, Math.min(200000, m.gold | 0)), mob: typeof m.mob === 'string' && /^[a-z0-9_]{1,24}$/.test(m.mob) ? m.mob : '', items: [], eq: [] };
+  if (Array.isArray(m.items)) for (const it of m.items.slice(0, 6)) if (Array.isArray(it) && typeof it[0] === 'string' && /^[a-z0-9_]{1,24}$/.test(it[0])) out.items.push([it[0], Math.max(1, Math.min(20, it[1] | 0))]);
+  if (Array.isArray(m.eq)) for (const e of m.eq.slice(0, 3)) if (e && typeof e.to === 'string' && e.to.length <= 32) out.eq.push({ to: e.to, l: Math.max(1, Math.min(60, e.l | 0)), b: Math.max(0, Math.min(0.6, +e.b || 0)), r: Math.max(0, Math.min(2, e.r | 0)) });
+  for (const o of p.m) if (o !== c && o.zone === c.zone) wsSend(o.sock, out);
+}
 
 function onMsg(c, m) {
   if (m.t === 'hello') {
@@ -278,9 +321,16 @@ function onMsg(c, m) {
   }
   if (!c.pid) return;
   if (m.t === 'st' && m.s && typeof m.s === 'object') {
-    const s = m.s; c.zone = m.z | 0; c.lastSt = now(); const nk = nameKey(s.n || '?'); if (c.nk !== nk) { c.nk = nk; wsSend(c.sock, { t: 'skins', skins: DB.grants[nk] || {} }); }
+    const s = m.s, oz = c.zone, ol = c.s ? c.s.l : 0, on = c.s ? c.s.n : ''; c.zone = m.z | 0; c.lastSt = now(); const nk = nameKey(s.n || '?'); if (c.nk !== nk) { c.nk = nk; wsSend(c.sock, { t: 'skins', skins: DB.grants[nk] || {} }); }
     c.s = { n: String(s.n || '?').slice(0, 16), c: String(s.c || 'warrior').slice(0, 12), l: Math.max(1, Math.min(60, s.l | 0)), x: Math.round(+s.x || 0), y: Math.round(+s.y || 0), d: s.d < 0 ? -1 : 1, w: Math.max(0, Math.min(10, s.w | 0)), a: s.a | 0, dead: s.dead ? 1 : 0, sk: typeof s.sk === 'string' && /^[a-z0-9_]{1,24}$/.test(s.sk) ? s.sk : '' };
     const p = c.p; if (p.n !== c.s.n) { p.n = c.s.n; markDirty(); } p.c = c.s.c; if (c.s.l > p.lvl) { p.lvl = c.s.l; p.maxL = Math.max(p.maxL, p.lvl); } if (c.zone >= 0) p.z = c.zone;
+    if (c.party && (oz !== c.zone || ol !== c.s.l || on !== c.s.n)) pState(c.party);
+  } else if (m.t === 'party' && typeof m.a === 'string') { onParty(c, m);
+  } else if (m.t === 'pshare') { onPartyShare(c, m);
+  } else if (m.t === 'who') {
+    const t = now(); if (t - (c.whoT || 0) < 800) return; c.whoT = t; const seen = new Set(), list = [];
+    for (const o of clients) { if (!o.s || seen.has(o.pid) || list.length >= 200) continue; seen.add(o.pid); list.push({ id: o.pid, n: o.s.n, c: o.s.c, l: o.s.l, z: o.zone, g: o.party ? 1 : 0 }); }
+    wsSend(c.sock, { t: 'who', list });
   } else if (m.t === 'chat' && typeof m.m === 'string') {
     const t = now(); if (t - c.lastChat < 700) return; c.lastChat = t;
     if (c.p.mute) return wsSend(c.sock, { t: 'admmsg', m: 'Você está silenciado e não pode usar o chat.', kind: 'pm' });

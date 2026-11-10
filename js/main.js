@@ -34,11 +34,13 @@ function goFull(manual) {
     Promise.resolve(rq.call(el, { navigationUI: 'hide' })).then(() => { try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => { }); } catch (e) { } setTimeout(layout, 300); }).catch(() => { if (manual) UI.toast('Tela cheia indisponível aqui.', 'bad'); });
   } catch (e) { }
 }
-function attackNearest() { if (P.dead) return; let m = P.target && !P.target.dead ? P.target : nearestMob(480); if (!m) { UI.toast('Nenhum inimigo por perto.', 'bad'); return; } P.target = m; P.engage = true; P.moveTo = null; P.cast = null; }
+function attackNearest() { if (P.dead) return; let m = nearestMob(480) || (P.target && !P.target.dead ? P.target : null); /* sempre o inimigo mais próximo */ if (!m) { UI.toast('Nenhum inimigo por perto.', 'bad'); return; } P.target = m; P.engage = true; P.moveTo = null; P.cast = null; }
 function nextTarget() { const l = G.mobs.filter(m => !m.dead && dist(P, m) < 560).sort((a, b) => dist(P, a) - dist(P, b)); if (!l.length) return; const i = l.indexOf(P.target); P.target = l[(i + 1) % l.length]; }
 function pickAt(wx, wy) {
   let best = null, bd = 1e9; const W = G.world;
   for (const m of G.mobs) { if (m.dead) continue; const d = Math.hypot(m.x - wx, m.y - mobHeight(m) * 0.45 - wy); if (d < m.rad + 22 && d < bd) { bd = d; best = { type: 'mob', o: m }; } }
+  if (best) return best;
+  for (const [id, p] of G.peers) { const d = Math.hypot(p.rx - wx, p.ry - 28 - wy); if (d < 30 && d < bd) { bd = d; best = { type: 'peer', o: p, id }; } }
   if (best) return best;
   for (const n of W.npcs) { const d = Math.hypot(n.x - wx, n.y - 28 - wy); if (d < 40 && d < bd) { bd = d; best = { type: 'npc', o: n }; } }
   for (const p of W.portals) { const d = Math.hypot(p.x - wx, p.y - 26 - wy); if (d < 48 && d < bd) { bd = d; best = { type: 'portal', o: p }; } }
@@ -69,11 +71,14 @@ function setupInput() {
   window.addEventListener('keyup', e => { G.keys[e.code] = false; });
   window.addEventListener('blur', () => { G.keys = {}; G.input.x = G.input.y = 0; });
   // margem de segurança: cliques no mapa perto da interface não fazem o personagem andar
-  const HUD_SEL = '#pframe,#tframe,#topright,#menu,#menubtn,#tracker>div,#chat,#chatbtn,#bottom,#prompt,#joy,#tact>*,#wins .win';
+  const JOY_SAFE = 80; // px de margem ao redor do joystick onde toques no mapa são ignorados
+  const HUD_SEL ='#pframe,#tframe,#topright,#menu,#menubtn,#tracker>div,#chat,#chatbtn,#bottom,#prompt,#joy,#tact>*,#wins .win';
   const nearHud = e => {
     const pad = UI.touch ? 22 : 30, x = e.clientX, y = e.clientY;
     for (const el of document.querySelectorAll(HUD_SEL)) {
       if (!el.offsetParent && getComputedStyle(el).position !== 'fixed') continue; const r = el.getBoundingClientRect(); if (r.width < 2 || r.height < 2) continue;
+      // joystick: zona de segurança circular bem maior, para o polegar que escapa não virar "andar até ali"
+      if (el.id === 'joy') { if (Math.hypot(x - (r.left + r.width / 2), y - (r.top + r.height / 2)) <= r.width / 2 + JOY_SAFE) return true; continue; }
       if (x >= r.left - pad && x <= r.right + pad && y >= r.top - pad && y <= r.bottom + pad) return true;
     }
     return false;
@@ -83,6 +88,7 @@ function setupInput() {
     if (nearHud(e)) { $('menu').classList.remove('open'); return; }
     $('menu').classList.remove('open');
     const sp = stagePt(e), w = screenToWorld(sp.x, sp.y), hit = pickAt(w.x, w.y);
+    if (hit && hit.type === 'peer') { const pid = hit.id, pn = hit.o.n || '?'; UI.modal('<h2>' + esc(pn) + '</h2><p class="dim">Nível ' + (hit.o.l | 0) + '</p><div class="row">' + (Net.mode === 'ws' ? '<button class="btn gold" data-act="partyinvite:' + esc(pid) + '">Convidar para o grupo</button>' : '') + '<button class="btn ghost" data-act="closeModal">Fechar</button></div>'); return; }
     if (hit && hit.type === 'mob') { P.target = hit.o; P.engage = true; P.moveTo = null; P.cast = null; }
     else if (hit) { const f = findNear(); if (dist(P, hit.o) < 64) interact({ type: hit.type, o: hit.o }); else { P.moveTo = { x: hit.o.x, y: hit.o.y + (hit.type === 'npc' ? 30 : 0), ent: { type: hit.type, o: hit.o } }; P.engage = false; P.cast = null; } }
     else { P.moveTo = { x: w.x, y: w.y }; P.engage = false; P.cast = null; }

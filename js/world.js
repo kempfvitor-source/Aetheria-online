@@ -113,7 +113,7 @@ function genWorld(id) {
     }
     W.spawns.push({ x: W.boss.x, y: W.boss.y, mob: Z.boss, boss: true });
     const kinds = ['ore', 'wood', 'herb'];
-    for (let n = 0; n < 42; n++) { const p = pick(2); if (!p) break; W.nodes.push({ kind: kinds[n % 3], tier: id, x: (p[0] + 0.5) * TILE, y: (p[1] + 0.6) * TILE, readyAt: 0 }); }
+    for (let n = 0; n < 90; n++) { /* 30 pontos de cada recurso por zona (antes: 14) */ const p = pick(2); if (!p) break; W.nodes.push({ kind: kinds[n % 3], tier: id, x: (p[0] + 0.5) * TILE, y: (p[1] + 0.6) * TILE, readyAt: 0 }); }
   }
   W.objs.sort((a, b) => a.y - b.y);
   return W;

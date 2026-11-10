@@ -4,6 +4,22 @@ const RD = { cv: null, g: null, W: 0, H: 0, zoom: 1, dpr: 1, cam: { x: 0, y: 0 }
 const CH = 12, CHPX = CH * TILE;
 const ORE_C = ['', '#c9772e', '#aab4bd', '#e6edf5', '#f2c230', '#7fe0d0', '#b05cff', '#ff7ad0'];
 
+/* ---------- Sprites 3D (renderizados no Blender, pasta img/) ----------
+   Cada sprite é opcional: enquanto a imagem não carrega (ou se não existir), o jogo usa a arte procedural.
+   Para adicionar outro monstro basta salvar img/mob_<id>.png (olhando para a direita, fundo transparente)
+   e registrar a altura em SPR3D_MOB. */
+const SPR3D = {};
+// altura em px (antes da escala de elite/chefe), deslocamento vertical (voadores) e tipo de animação
+const SPR3D_MOB = { slime: { h: 34, an: 'squash' }, boar: { h: 42 }, sprite: { h: 46, fly: 16 }, kingslime: { h: 44, an: 'squash' }, wolf: { h: 40 }, shroom: { h: 48 }, goblin: { h: 46 }, ent: { h: 70 },
+  toad: { h: 36, an: 'squash' }, spider: { h: 34 }, hag: { h: 54 }, hydra: { h: 62 }, scorpion: { h: 40 }, mummy: { h: 54 }, djinn: { h: 52, fly: 8 }, pharaoh: { h: 62 },
+  icewolf: { h: 40 }, icegolem: { h: 60 }, wraith: { h: 50, fly: 10 }, wyrm: { h: 64 } };
+const SPR3D_TREES = { 0: ['tree_z1_0', 'tree_z1_2'], 1: ['tree_z1_0', 'tree_z1_2'], 2: ['tree_z2_1', 'tree_z2_3'], 3: ['tree_z3_0', 'tree_z3_1'], 4: ['tree_z4_0', 'tree_z4_1'], 5: ['tree_z5_0', 'tree_z5_1'] };
+const SPR3D_ROCKS = { 0: ['rock_z1_0', 'rock_z1_1'], 1: ['rock_z1_0', 'rock_z1_1'], 2: ['rock_z2_0', 'rock_z2_1'], 3: ['rock_z3_0', 'rock_z3_1'], 4: ['rock_z4_0', 'rock_z4_1'], 5: ['rock_z5_0', 'rock_z5_1'] };
+function loadSpr3D() {
+  const names = ['hero_warrior']; for (const k in SPR3D_MOB) names.push('mob_' + k);
+  for (const z in SPR3D_TREES) for (const n of SPR3D_TREES[z].concat(SPR3D_ROCKS[z])) if (!names.includes(n)) names.push(n);
+  for (const n of names) { const im = new Image(); im.onload = () => { SPR3D[n] = im; if (n[0] !== 'm' && n[0] !== 'h') RD.sprZone = -1; }; im.src = 'img/' + n + '.png'; }
+}
 function mkCanvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
 function shade(hex, amt) {
   const n = parseInt(hex.slice(1), 16); let r = n >> 16, g = (n >> 8) & 255, b = n & 255;
@@ -130,6 +146,9 @@ function buildSprites(W) {
   g.shadowColor = hc; g.shadowBlur = 8; g.fillStyle = hc; for (const [x, y] of [[-12, -20], [0, -30], [12, -22]]) { circ(g, x, y, 5); g.fill(); }
   g.shadowBlur = 0; g.fillStyle = '#fff8'; for (const [x, y] of [[-12, -20], [0, -30], [12, -22]]) { circ(g, x - 1, y - 1, 2); g.fill(); }
   S.herb = c;
+  // árvores e rochas do Blender (zonas que já têm modelos); mesma âncora dos sprites procedurais
+  const put = (list, names, cw, chh, ax, ay, maxW, maxH, shw) => { if (!names) return; names.forEach((n, v) => { const im = SPR3D[n]; if (!im) return; const cv = mkCanvas(cw, chh), q = cv.getContext('2d'); q.translate(ax, ay); q.fillStyle = 'rgba(0,0,0,0.25)'; ell(q, 0, 2, shw, shw * 0.3); q.fill(); const k = Math.min(maxW / im.width, maxH / im.height), w = im.width * k, hh = im.height * k; q.drawImage(im, -w / 2, -hh + 3, w, hh); list[v] = cv; }); };
+  put(S.tree, SPR3D_TREES[W.id], 130, 160, 65, 148, 114, 140, 26); put(S.rock, SPR3D_ROCKS[W.id], 80, 70, 40, 58, 64, 46, 24);
   RD.spr = S; RD.sprZone = W.id;
 }
 
@@ -156,6 +175,12 @@ function drawHero(g, x, y, o) {
   const FXS = o.skin && SKIN_FX[o.skin] && !o.dead ? SKIN_FX[o.skin] : null; if (FXS) FXS.back(g, t, mv);
   if (o.wings) drawWings(g, o.wings, t, mv);
   g.scale(o.dir || 1, 1);
+  const h3 = o.cls === 'warrior' && !(o.skin && SKIN_DRAW[o.skin]) ? SPR3D.hero_warrior : null;
+  if (h3) { // Guerreiro modelado no Blender (skins continuam com a arte própria)
+    const hh = 66, w = hh * h3.width / h3.height, a3 = o.atk > 0 ? o.atk : 0, sw3 = a3 > 0 ? Math.sin((1 - a3) * Math.PI) : 0;
+    g.translate(sw3 * 5, mv ? -Math.abs(Math.sin(t * 13)) * 1.8 : bob); g.rotate(sw3 * 0.16 + (mv ? Math.sin(t * 13) * 0.03 : 0));
+    g.drawImage(h3, -w * 0.42, -hh + 2, w, hh); g.restore(); return;
+  }
   const l = mv ? Math.sin(t * 13) * 3.5 : 0;
   g.fillStyle = '#3a2f2a'; rrect(g, -7, -11 + Math.max(0, l) * 0.5 - 0, 5.5, 11 - Math.max(0, l) * 0.5, 2); g.fill(); rrect(g, 1.5, -11 + Math.max(0, -l) * 0.5, 5.5, 11 - Math.max(0, -l) * 0.5, 2); g.fill();
   g.translate(0, bob);
@@ -228,6 +253,17 @@ function drawMob(g, m, t) {
   if (m.flash > 0) g.filter = 'brightness(2.2)';
   if (m.slow > 0) { g.shadowColor = '#7fd0ff'; g.shadowBlur = 10; }
   const mv = m.moving, wob = Math.sin(tt * (mv ? 11 : 3));
+  const s3 = SPR3D['mob_' + d.id], c3 = SPR3D_MOB[d.id];
+  if (s3 && c3) {
+    const hh = c3.h, w = hh * s3.width / s3.height, lunge = m.atkAnim > 0 ? Math.sin((m.atkAnim / 0.3) * Math.PI) * 6 : 0;
+    let sx = 1, sy = 1, dy = 0;
+    if (c3.an === 'squash') { sy = 1 + wob * 0.07; sx = 1 - wob * 0.05; }
+    else if (c3.fly) dy = -c3.fly + Math.sin(tt * 2.6) * 3;
+    else dy = mv ? -Math.abs(wob) * 2.2 : wob * 0.6;
+    g.translate(lunge, dy); if (!c3.an && !c3.fly && mv) g.rotate(wob * 0.035);
+    g.scale(sx, sy); g.drawImage(s3, -w / 2, -hh + 2, w, hh);
+    g.restore(); return;
+  }
   switch (d.kind) {
     case 'slime': {
       const sq = 1 + wob * 0.09; const gr = g.createRadialGradient(-4, -14, 2, 0, -8, 20); gr.addColorStop(0, shade(c, 0.45)); gr.addColorStop(1, shade(c, -0.15));
@@ -303,7 +339,8 @@ function drawMob(g, m, t) {
   }
   g.restore();
 }
-function mobHeight(m) { return (m.def.kind === 'golem' ? 56 : m.def.kind === 'humanoid' ? 50 : m.def.kind === 'dragon' ? 52 : 40) * (m.def.boss ? 2.1 : m.elite ? 1.3 : 1); }
+loadSpr3D();
+function mobHeight(m) { const c3 = SPR3D_MOB[m.def.id]; if (c3 && SPR3D['mob_' + m.def.id]) return (c3.h + (c3.fly || 0)) * (m.def.boss ? 2.1 : m.elite ? 1.3 : 1); return (m.def.kind === 'golem' ? 56 : m.def.kind === 'humanoid' ? 50 : m.def.kind === 'dragon' ? 52 : 40) * (m.def.boss ? 2.1 : m.elite ? 1.3 : 1); }
 
 /* ---------- Efeitos ---------- */
 function fxText(x, y, text, color, big) { RD.texts.push({ x: x + (Math.random() - 0.5) * 16, y, text, color, big, life: 1.1, vy: -46 }); if (RD.texts.length > 60) RD.texts.shift(); }
