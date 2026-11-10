@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Aetheria Online</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Alegreya+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="stage">
+<canvas id="cv"></canvas>
+
+<div id="hud" class="hidden">
+  <div id="pframe" class="panel">
+    <div id="pport"></div>
+    <div class="pf-main">
+      <div class="pf-name"><span id="pname"></span><span id="plvl"></span></div>
+      <div class="bar hp"><i id="hpf"></i><b id="hpt"></b></div>
+      <div class="bar mp"><i id="mpf"></i><b id="mpt"></b></div>
+    </div>
+    <div id="buffs"></div>
+  </div>
+  <div id="tframe" class="panel hidden"><div class="pf-name"><span id="tname"></span><span id="tlvl"></span></div><div class="bar hp"><i id="thpf"></i><b id="thpt"></b></div></div>
+  <div id="topright">
+    <div id="miniwrap" class="panel"><canvas id="mini" width="150" height="110"></canvas><div id="zname"></div></div>
+    <div id="netst" class="panel"></div>
+    <div id="gold" class="panel"></div>
+  </div>
+  <div id="menu"></div>
+  <button id="menubtn" class="rbtn">☰</button>
+  <div id="tracker"></div>
+  <div id="chat" class="panel">
+    <div id="chatlog"></div>
+    <form id="chatform"><input id="chatin" maxlength="140" placeholder="Enter para conversar…" autocomplete="off"><button type="submit">➤</button></form>
+  </div>
+  <button id="chatbtn" class="rbtn">💬</button>
+  <div id="bottom">
+    <div id="xpbar"><i id="xpf"></i><b id="xpt"></b></div>
+    <div id="hotbar"></div>
+  </div>
+  <button id="prompt" class="hidden"></button>
+  <div id="joy"><div id="joyk"></div></div>
+  <div id="tact"></div>
+  <div id="toasts"></div>
+</div>
+
+<div id="wins"></div>
+<div id="banner"></div>
+<div id="death" class="hidden"><div class="panel deathbox"><h2>Você foi derrotado</h2><p id="deathmsg"></p><div class="row"><button class="btn" data-act="respawn:0">Renascer na entrada</button><button class="btn" data-act="respawn:1">Voltar à vila</button></div></div></div>
+<div id="modal" class="hidden"></div>
+<div id="fade"></div>
+
+<div id="title">
+  <canvas id="titlebg"></canvas>
+  <div class="title-inner">
+    <h1>AETHERIA</h1>
+    <div class="sub">ONLINE · Crônicas do Véu</div>
+    <div id="titlebody" class="panel"></div>
+    <div id="titlenet"></div>
+  </div>
+</div>
+
+</div>
+<script src="js/data.js"></script>
+<script src="js/world.js"></script>
+<script src="js/render.js"></script>
+<script src="js/game.js"></script>
+<script src="js/net.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
