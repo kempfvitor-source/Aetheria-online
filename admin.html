@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Aetheria Online — Painel ADM</title>
+<link rel="icon" href="data:,">
+<style>
+:root{--bg:#0e0b1a;--panel:#171329;--panel2:#1f1a36;--line:#2e2750;--txt:#ece8ff;--mut:#9a93bd;--acc:#a37bff;--acc2:#7a4fd0;--good:#4fd18b;--bad:#ff6a6a;--warn:#ffbf47;--gold:#ffd24a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+button{background:var(--acc2);border:0;border-radius:8px;padding:7px 12px;cursor:pointer;color:#fff;white-space:nowrap}
+button:hover{filter:brightness(1.15)} button.ghost{background:transparent;border:1px solid var(--line);color:var(--txt)} button.danger{background:#a83a4a} button.small{padding:4px 9px;font-size:12.5px}
+input,select,textarea{background:#0f0c1e;border:1px solid var(--line);border-radius:8px;padding:7px 10px;min-width:0}
+textarea{width:100%;resize:vertical}
+header{position:sticky;top:0;z-index:5;background:rgba(14,11,26,.94);backdrop-filter:blur(6px);border-bottom:1px solid var(--line)}
+.top{display:flex;align-items:center;gap:12px;padding:10px 18px}
+.top h1{font-size:17px;margin:0;letter-spacing:.3px} .top h1 b{color:var(--acc)}
+.top .sp{flex:1} .pill{font-size:12px;padding:3px 9px;border-radius:99px;background:var(--panel2);color:var(--mut)} .pill.ok{color:var(--good)} .pill.bad{color:var(--bad)} .pill.warn{color:var(--warn)}
+nav{display:flex;gap:2px;padding:0 12px;overflow-x:auto}
+nav button{background:none;border-radius:0;border-bottom:2px solid transparent;color:var(--mut);padding:9px 12px}
+nav button.on{color:var(--txt);border-color:var(--acc)}
+main{max-width:1240px;margin:0 auto;padding:18px}
+.grid{display:grid;gap:14px} .g4{grid-template-columns:repeat(4,1fr)} .g2{grid-template-columns:1fr 1fr} .g3{grid-template-columns:repeat(3,1fr)}
+@media(max-width:900px){.g4{grid-template-columns:1fr 1fr}.g2,.g3{grid-template-columns:1fr}}
+@media(max-width:560px){.top{padding:8px 12px;gap:6px}.top h1{font-size:15px;white-space:nowrap}.pill{font-size:11px;padding:2px 7px}main{padding:12px}.fun{grid-template-columns:110px 1fr 54px}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;min-width:0}
+.card h2{font-size:14.5px;margin:0 0 10px;display:flex;align-items:center;gap:8px} .card h2 small{font-weight:400;color:var(--mut);font-size:12.5px}
+.card h2 .sp{flex:1}
+.kpi .v{font-size:26px;font-weight:700} .kpi .l{color:var(--mut);font-size:12.5px}
+.mut{color:var(--mut)} .good{color:var(--good)} .bad{color:var(--bad)} .warn{color:var(--warn)} .gold{color:var(--gold)}
+.hint{color:var(--mut);font-size:12.5px;margin:4px 0 10px}
+table{width:100%;border-collapse:collapse} th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:middle} th{color:var(--mut);font-weight:500;font-size:12.5px;white-space:nowrap} tr.click{cursor:pointer} tr.click:hover td{background:var(--panel2)}
+.tw{overflow-x:auto}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.bar{position:relative;height:22px;background:#120f22;border-radius:6px;overflow:hidden}
+.bar i{position:absolute;inset:0 auto 0 0;background:linear-gradient(90deg,var(--acc2),var(--acc));border-radius:6px}
+.bar i.r{background:linear-gradient(90deg,#8a2c3c,var(--bad))} .bar i.y{background:linear-gradient(90deg,#8a6a1c,var(--warn))} .bar i.g{background:linear-gradient(90deg,#1f7a50,var(--good))}
+.bar>span{position:absolute;left:8px;top:2px;font-size:12px;white-space:nowrap;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+a{color:#c9b3ff;text-decoration:none} a:hover{text-decoration:underline}
+.fun{display:grid;grid-template-columns:minmax(150px,260px) 1fr 120px;gap:6px 12px;align-items:center}
+.fun .zh{grid-column:1/-1;margin-top:10px;color:var(--acc);font-weight:600;font-size:13px}
+.fun .lb{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .fun .dr{font-size:12px;text-align:right}
+.tag{display:inline-block;font-size:11.5px;padding:1px 7px;border-radius:99px;background:var(--panel2);color:var(--mut);margin-right:4px}
+.tag.on{background:#173b2b;color:var(--good)} .tag.ban{background:#3b1720;color:var(--bad)} .tag.mute{background:#3b3017;color:var(--warn)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap} .row>input,.row>select{flex:1}
+.feed{max-height:520px;overflow:auto} .feed div{padding:6px 2px;border-bottom:1px solid var(--line);font-size:13px} .feed time{color:var(--mut);font-size:12px;margin-right:6px;font-variant-numeric:tabular-nums}
+.hist{display:flex;align-items:flex-end;gap:3px;height:130px;padding-top:8px} .hist div{flex:1;background:var(--acc2);border-radius:3px 3px 0 0;position:relative;min-height:2px} .hist div:hover{background:var(--acc)}
+.hl{display:flex;gap:3px;font-size:10.5px;color:var(--mut)} .hl span{flex:1;text-align:center}
+#login{max-width:360px;margin:12vh auto;text-align:center} #login .card{padding:26px}
+#drawer{position:fixed;inset:0 0 0 auto;width:min(560px,100%);background:var(--panel);border-left:1px solid var(--line);z-index:20;overflow:auto;padding:18px;transform:translateX(105%);transition:transform .2s;box-shadow:-20px 0 40px rgba(0,0,0,.4)}
+#drawer.open{transform:none} #drawer h3{margin:16px 0 8px;font-size:14px;color:var(--acc)}
+#shade{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:19;display:none} #shade.open{display:block}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);padding:9px 16px;border-radius:10px;z-index:50}
+.empty{color:var(--mut);padding:18px;text-align:center}
+.hidden{display:none!important}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:13px} .kv b{font-weight:500;color:var(--mut)}
+</style>
+</head>
+<body>
+<div id="login" class="hidden">
+  <div class="card">
+    <div style="font-size:40px">🛡️</div>
+    <h2 style="justify-content:center">Painel ADM — Aetheria Online</h2>
+    <form id="loginf" class="grid" style="gap:10px">
+      <input id="key" type="password" placeholder="Senha de ADM (ADMIN_KEY)" autocomplete="current-password">
+      <button>Entrar</button>
+      <div id="loginerr" class="bad"></div>
+    </form>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+<header>
+  <div class="top"><h1>🛡️ <b>Aetheria</b> ADM</h1><span class="sp"></span><span id="st-online" class="pill"></span><span id="st-store" class="pill"></span><button class="ghost small" id="logout">Sair</button></div>
+  <nav id="tabs"></nav>
+</header>
+<main id="view"></main>
+</div>
+<div id="shade"></div>
+<aside id="drawer"></aside>
+
+<script src="/js/data.js"></script>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const TABS = [['geral', 'Visão geral'], ['jogadores', 'Jogadores'], ['funil', 'Funil'], ['missoes', 'Missões'], ['saidas', 'Onde saem'], ['atividade', 'Atividade'], ['linha', 'Linha do tempo'], ['chat', 'Chat'], ['servidor', 'Servidor']];
+let TOK = null, ST = null, TAB = 'geral', OPEN = null, CHURN_DAYS = 3, FEED_P = '', FEED_E = '';
+try { TOK = localStorage.getItem('aeth_adm_tok'); TAB = localStorage.getItem('aeth_adm_tab') || 'geral'; } catch (e) { }
+
+/* ---------- utilidades ---------- */
+const dur = s => { s = Math.max(0, Math.round(s || 0)); if (s < 60) return s + 's'; const m = Math.floor(s / 60); if (m < 60) return m + 'min'; const h = Math.floor(m / 60); return h + 'h ' + String(m % 60).padStart(2, '0') + 'min'; };
+const ago = ts => { if (!ts) return '—'; const s = (ST.now - ts) / 1000; if (s < 60) return 'agora'; if (s < 3600) return Math.floor(s / 60) + ' min atrás'; if (s < 86400) return Math.floor(s / 3600) + ' h atrás'; return Math.floor(s / 86400) + ' d atrás'; };
+const hm = ts => new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+const dt = ts => new Date(ts).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
+const median = a => { if (!a.length) return null; const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+const zn = z => (ZONES[z] && ZONES[z].name) || ('Zona ' + z);
+const qn = id => (QUEST_BY_ID[id] && QUEST_BY_ID[id].name) || id;
+const mn = id => (MOBS[id] && MOBS[id].name) || id || 'algo';
+const cn = c => (CLASSES[c] && CLASSES[c].name) || c || '—';
+const NPCN = k => (NPCS[k] && NPCS[k].name) || k;
+function toast(m, bad) { const d = document.createElement('div'); d.className = 'toast ' + (bad ? 'bad' : ''); d.textContent = m; document.body.appendChild(d); setTimeout(() => d.remove(), 2800); }
+const bar = (v, max, label, cls) => '<div class="bar"><i class="' + (cls || '') + '" style="width:' + (max ? Math.max(v ? 1.5 : 0, v / max * 100) : 0) + '%"></i><span>' + label + '</span></div>';
+function evText(e) {
+  const d = e.d || {};
+  switch (e.e) {
+    case 'start': return d.nw ? '✨ Criou personagem e começou a jogar' : '▶️ Entrou no jogo';
+    case 'lvl': return '⬆️ Subiu para o nível <b>' + d.l + '</b>';
+    case 'zone': return '🗺️ Entrou em ' + esc(zn(d.z));
+    case 'qa': return '📜 Aceitou <b>' + esc(qn(d.q)) + '</b>';
+    case 'qr': return '🎯 Cumpriu o objetivo de <b>' + esc(qn(d.q)) + '</b>';
+    case 'qt': return '✅ Entregou <b>' + esc(qn(d.q)) + '</b>';
+    case 'death': return '💀 Morreu para ' + esc(mn(d.m)) + ' em ' + esc(zn(d.z != null ? d.z : e.z));
+    case 'boss': return '👑 Derrotou o chefe <b>' + esc(mn(d.m)) + '</b>';
+    case 'npc': return '💬 Falou com ' + esc(NPCN(d.k));
+    case 'enh': return (d.ok ? '🔨 Reforço +' + d.l + ' <span class="good">sucesso</span>' : '🔨 Reforço +' + d.l + ' <span class="bad">falhou</span>');
+    case 'forge': return '⚒️ Forjou um item (' + esc(d.k) + ')';
+    case 'brew': return '⚗️ Preparou ' + esc((ITEMS[d.k] && ITEMS[d.k].name) || d.k);
+    case 'wings': return '🪽 Melhorou as asas';
+    case 'tp': return '🌀 Teleportou para ' + esc(zn(d.z));
+    case 'adm': return '🛡️ <span class="warn">ADM: ' + esc({ kick: 'expulsou', ban: 'baniu', unban: 'desbaniu', mute: 'silenciou', unmute: 'liberou o chat', give: 'deu presente', tp: 'teleportou', heal: 'curou', msg: 'mensagem privada' }[d.k] || d.k) + '</span>';
+  }
+  return esc(e.e);
+}
+
+/* ---------- API ---------- */
+async function call(path, body) {
+  const r = await fetch(path, { method: body ? 'POST' : 'GET', headers: Object.assign({ 'x-adm': TOK || '' }, body ? { 'Content-Type': 'application/json' } : {}), body: body ? JSON.stringify(body) : undefined });
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 401 && path !== '/api/login') { showLogin(); throw new Error('login'); }
+  if (!r.ok) throw new Error(j.err || 'Erro ' + r.status);
+  return j;
+}
+async function act(body, okMsg) { try { await call('/api/action', body); toast(okMsg || 'Feito.'); await refresh(); if (OPEN) openPlayer(OPEN, true); return true; } catch (e) { if (e.message !== 'login') toast(e.message, 1); return false; } }
+function showLogin() { $('app').classList.add('hidden'); $('login').classList.remove('hidden'); $('key').focus(); }
+$('loginf').onsubmit = async e => {
+  e.preventDefault(); $('loginerr').textContent = '';
+  try { const j = await call('/api/login', { key: $('key').value }); TOK = j.token; try { localStorage.setItem('aeth_adm_tok', TOK); } catch (x) { } $('key').value = ''; $('login').classList.add('hidden'); $('app').classList.remove('hidden'); refresh(); }
+  catch (x) { $('loginerr').textContent = x.message; }
+};
+$('logout').onclick = () => { TOK = null; try { localStorage.removeItem('aeth_adm_tok'); } catch (e) { } showLogin(); };
+
+let busy = false;
+async function refresh() {
+  if (busy || !TOK) return; busy = true;
+  try { ST = await call('/api/state'); $('login').classList.add('hidden'); $('app').classList.remove('hidden'); header(); render(); }
+  catch (e) { if (e.message !== 'login') { $('st-online').textContent = 'sem conexão'; $('st-online').className = 'pill bad'; } }
+  busy = false;
+}
+setInterval(() => { if (!document.hidden && !document.activeElement.matches('#view input, #view textarea, #view select')) refresh(); }, 5000);
+
+/* ---------- dados derivados ---------- */
+function players() { return Object.values(ST.players); }
+function isOnline(id) { return ST.online.some(o => o.id === id); }
+function churned(p) { return !isOnline(p.id) && ST.now - p.last > CHURN_DAYS * 864e5; }
+function curQuest(p) { return p.aq && p.aq.length ? p.aq[0] : null; }
+function questStats() {
+  const P = players(), out = {};
+  for (const q of QUESTS) {
+    const r = { q, acc: 0, done: 0, active: [], times: [], deaths: [], aband: 0 };
+    for (const p of P) {
+      const x = p.q && p.q[q.id]; if (!x) continue;
+      if (x.a != null || x.at || x.t != null) r.acc++;
+      if (x.t != null) { r.done++; if (x.t >= 0 && x.a != null && x.t >= x.a) r.times.push(x.t - x.a); if (x.dd != null) r.deaths.push(x.dd); }
+      else if (p.aq && p.aq.includes(q.id)) { const el = x.a != null ? p.play - x.a : null; r.active.push({ p, el, deaths: x.d0 != null ? p.deaths - x.d0 : null }); if (churned(p)) r.aband++; }
+    }
+    r.med = median(r.times); r.limit = Math.max(r.med != null ? r.med * 2 : 1800, 900);
+    r.stuck = r.active.filter(a => a.el != null && a.el > r.limit && !churned(a.p));
+    out[q.id] = r;
+  }
+  return out;
+}
+
+/* ---------- topo ---------- */
+function header() {
+  $('st-online').textContent = '🟢 ' + ST.online.length + ' online'; $('st-online').className = 'pill ok';
+  const s = ST.server.store; const el = $('st-store');
+  if (s.mode === 'gist') { el.textContent = s.err ? '⚠️ erro ao salvar' : '☁️ dados salvos no GitHub'; el.className = 'pill ' + (s.err ? 'bad' : 'ok'); }
+  else { el.textContent = '⚠️ dados temporários'; el.className = 'pill warn'; }
+  el.title = s.mode === 'gist' ? 'Último envio: ' + (s.lastSync ? dt(s.lastSync) : 'ainda não') + (s.err ? '\n' + s.err : '') : 'Sem GITHUB_TOKEN: os dados somem quando o servidor gratuito reinicia. Veja a aba Servidor.';
+  $('tabs').innerHTML = TABS.map(([k, n]) => '<button data-tab="' + k + '" class="' + (k === TAB ? 'on' : '') + '">' + n + '</button>').join('');
+}
+$('tabs').onclick = e => { const b = e.target.closest('[data-tab]'); if (!b) return; TAB = b.dataset.tab; try { localStorage.setItem('aeth_adm_tab', TAB); } catch (x) { } header(); render(); window.scrollTo(0, 0); };
+
+function render() { const f = VIEWS[TAB] || VIEWS.geral; $('view').innerHTML = f(); }
+const VIEWS = {};
+
+/* ---------- Visão geral ---------- */
+VIEWS.geral = () => {
+  const P = players(), named = P.filter(p => p.n), day = ST.now - 864e5, week = ST.now - 7 * 864e5;
+  const act24 = new Set(ST.sessions.filter(s => s.e > day).map(s => s.p)); ST.online.forEach(o => act24.add(o.id));
+  const act7 = new Set(ST.sessions.filter(s => s.e > week).map(s => s.p)); ST.online.forEach(o => act7.add(o.id));
+  const sl = ST.sessions.filter(s => s.e > week).map(s => (s.e - s.s) / 1000), qs = questStats();
+  const stuck = Object.values(qs).flatMap(r => r.stuck.map(a => Object.assign({ r }, a))).sort((a, b) => b.el - a.el);
+  const drops = funnelSteps().filter(s => s.drop > 0 && s.i > 1).sort((a, b) => b.drop - a.drop).slice(0, 3);
+  let h = '<div class="grid g4">' + [
+    [ST.online.length, 'online agora'], [named.length, 'jogadores com personagem'], [act24.size, 'jogaram nas últimas 24h'], [sl.length ? dur(median(sl)) : '—', 'sessão típica (mediana, 7 dias)'],
+  ].map(([v, l]) => '<div class="card kpi"><div class="v">' + v + '</div><div class="l">' + l + '</div></div>').join('') + '</div>';
+  h += '<div class="grid g2" style="margin-top:14px"><div class="card"><h2>🟢 Online agora</h2>' + onlineTable() + '</div>';
+  h += '<div class="card"><h2>📢 Avisar todos os jogadores</h2><div class="row"><input id="ann" maxlength="200" placeholder="Ex.: Evento de XP dobrado às 20h!"><button onclick="annSend()">Enviar</button></div><p class="hint">Aparece como aviso na tela e no chat de quem estiver online.</p>';
+  h += '<h2 style="margin-top:16px">🧭 Alertas</h2>';
+  if (!stuck.length && !drops.length) h += '<div class="mut">Nada preocupante por enquanto. Os alertas aparecem quando há jogadores travados numa missão ou quedas fortes no funil.</div>';
+  for (const s of stuck.slice(0, 5)) h += '<div style="margin:6px 0">⏳ <a href="#" onclick="openPlayer(\'' + s.p.id + '\');return false"><b>' + esc(s.p.n || '?') + '</b></a> está há <b class="warn">' + dur(s.el) + '</b> em <b>' + esc(s.r.q.name) + '</b>' + (s.r.med != null ? ' <span class="mut">(normal: ' + dur(s.r.med) + ')</span>' : '') + (s.deaths ? ' · ' + s.deaths + ' mortes' : '') + '</div>';
+  for (const d of drops) h += '<div style="margin:6px 0">📉 <b>' + d.drop + '</b> jogador(es) pararam antes de <b>' + esc(d.label) + '</b> <span class="mut">(' + pct(d.drop, d.prev) + '% de quem chegou na etapa anterior)</span></div>';
+  h += '</div></div>';
+  h += '<div class="card" style="margin-top:14px"><h2>🕒 Últimos acontecimentos <span class="sp"></span><button class="ghost small" onclick="TAB=\'linha\';header();render()">ver tudo</button></h2><div class="feed" style="max-height:300px">' + feedRows(ST.events.slice(-25).reverse()) + '</div></div>';
+  return h;
+};
+function onlineTable() {
+  if (!ST.online.length) return '<div class="empty">Ninguém online agora.</div>';
+  return '<div class="tw"><table><tr><th>Jogador</th><th>Nível</th><th>Onde</th><th>Missão atual</th><th>Sessão</th><th></th></tr>' + ST.online.map(o => {
+    const p = ST.players[o.id] || {}, q = curQuest(p);
+    return '<tr class="click" onclick="openPlayer(\'' + o.id + '\')"><td><b>' + esc(o.n || p.n || '(criando)') + '</b>' + (o.admin ? ' <span class="tag">ADM</span>' : '') + (o.idle > 60 ? ' <span class="tag">parado ' + dur(o.idle) + '</span>' : '') + '</td><td>' + (o.l || p.lvl || 1) + '</td><td>' + esc(o.z >= 0 ? zn(o.z) : '—') + '</td><td>' + (q ? esc(qn(q)) : '<span class="mut">—</span>') + '</td><td>' + dur((ST.now - o.since) / 1000) + '</td><td><button class="ghost small" onclick="event.stopPropagation();quickKick(\'' + o.id + '\')">Expulsar</button></td></tr>';
+  }).join('') + '</table></div>';
+}
+window.annSend = () => { const m = $('ann').value.trim(); if (!m) return; act({ a: 'announce', msg: m }, 'Aviso enviado.').then(ok => { if (ok) $('ann').value = ''; }); };
+window.quickKick = id => { const p = ST.players[id]; if (confirm('Expulsar ' + (p && p.n || 'jogador') + '? Ele pode entrar de novo.')) act({ a: 'kick', pid: id }, 'Jogador expulso.'); };
+
+/* ---------- Jogadores ---------- */
+let PSORT = 'last', PQ = '';
+VIEWS.jogadores = () => {
+  let P = players().filter(p => !PQ || (p.n || '').toLowerCase().includes(PQ.toLowerCase()));
+  const key = { last: p => -(isOnline(p.id) ? 9e15 : p.last), lvl: p => -p.lvl, play: p => -p.play, first: p => -p.first, n: p => (p.n || '~').toLowerCase() }[PSORT];
+  P.sort((a, b) => { const x = key(a), y = key(b); return x < y ? -1 : x > y ? 1 : 0; });
+  let h = '<div class="card"><h2>👥 Jogadores <small>' + P.length + '</small><span class="sp"></span><input id="pq" placeholder="Buscar nome" value="' + esc(PQ) + '" oninput="PQ=this.value;render();setTimeout(()=>{const i=$(\'pq\');i.focus();i.setSelectionRange(99,99)})" style="max-width:180px"><select onchange="PSORT=this.value;render()">' + [['last', 'Visto por último'], ['lvl', 'Nível'], ['play', 'Tempo jogado'], ['first', 'Mais novos'], ['n', 'Nome']].map(([k, n]) => '<option value="' + k + '"' + (k === PSORT ? ' selected' : '') + '>' + n + '</option>').join('') + '</select></h2>';
+  if (!P.length) return h + '<div class="empty">Nenhum jogador ainda.</div></div>';
+  h += '<div class="tw"><table><tr><th>Nome</th><th>Classe</th><th class="num">Nível</th><th>Missão atual</th><th>Zona</th><th class="num">Tempo jogado</th><th class="num">Sessões</th><th class="num">Mortes</th><th>Visto</th></tr>';
+  for (const p of P) {
+    const q = curQuest(p), tags = (isOnline(p.id) ? '<span class="tag on">online</span>' : '') + (p.ban ? '<span class="tag ban">banido</span>' : '') + (p.mute ? '<span class="tag mute">mudo</span>' : '') + (churned(p) ? '<span class="tag">sumiu</span>' : '');
+    h += '<tr class="click" onclick="openPlayer(\'' + p.id + '\')"><td><b>' + esc(p.n || '(sem personagem)') + '</b> ' + tags + '</td><td>' + esc(cn(p.c)) + '</td><td class="num">' + p.lvl + '</td><td>' + (q ? esc(qn(q)) : '<span class="mut">' + (p.done >= QUESTS.length ? 'todas concluídas' : '—') + '</span>') + '</td><td>' + esc(zn(p.z)) + '</td><td class="num">' + dur(p.play) + '</td><td class="num">' + p.sess + '</td><td class="num">' + p.deaths + '</td><td>' + (isOnline(p.id) ? '<span class="good">agora</span>' : ago(p.last)) + '</td></tr>';
+  }
+  return h + '</table></div></div>';
+};
+
+/* ---------- Ficha do jogador ---------- */
+async function openPlayer(id, keep) {
+  OPEN = id; $('drawer').classList.add('open'); $('shade').classList.add('open');
+  if (!keep) $('drawer').innerHTML = '<div class="empty">Carregando…</div>';
+  let d; try { d = await call('/api/player?id=' + encodeURIComponent(id)); } catch (e) { $('drawer').innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; return; }
+  const p = d.player, on = isOnline(id), q = curQuest(p), qx = q && p.q[q];
+  const skins = Object.keys(SKINS).map(k => { const has = ST.grants[nkey(p.n)] && ST.grants[nkey(p.n)][k]; return '<button class="' + (has ? '' : 'ghost') + ' small" onclick="act({a:\'skin\',pid:\'' + id + '\',skin:\'' + k + '\',on:' + !has + '},\'' + (has ? 'Skin removida.' : 'Skin concedida.') + '\')">' + SKINS[k].icon + ' ' + esc(SKINS[k].name) + (has ? ' ✓' : '') + '</button>'; }).join(' ');
+  const zt = Object.entries(p.zt || {}).sort((a, b) => b[1] - a[1]);
+  let h = '<div class="row"><h2 style="margin:0;flex:1">' + esc(p.n || '(sem personagem)') + ' ' + (on ? '<span class="tag on">online</span>' : '') + (p.ban ? '<span class="tag ban">banido</span>' : '') + (p.mute ? '<span class="tag mute">mudo</span>' : '') + '</h2><button class="ghost small" onclick="closeDrawer()">✕</button></div>';
+  h += '<div class="kv" style="margin-top:10px"><b>Classe</b><span>' + esc(cn(p.c)) + ' · nível ' + p.lvl + (p.w ? ' · asas ' + p.w : '') + '</span><b>Onde está</b><span>' + esc(zn(p.z)) + '</span><b>Missão atual</b><span>' + (q ? esc(qn(q)) + (qx && qx.a != null ? ' <span class="mut">há ' + dur(p.play - qx.a) + ' de jogo</span>' : '') : '—') + '</span><b>Missões feitas</b><span>' + p.done + ' de ' + QUESTS.length + '</span><b>Tempo jogado</b><span>' + dur(p.play) + ' ativo · ' + dur(p.conn) + ' conectado · ' + p.sess + ' sessões</span><b>Primeira vez</b><span>' + dt(p.first) + '</span><b>Visto por último</b><span>' + (on ? 'agora' : dt(p.last)) + '</span><b>Combate</b><span>' + p.kills + ' abates · ' + p.deaths + ' mortes</span><b>Ouro</b><span>' + Math.round(p.gold).toLocaleString('pt-BR') + '</span><b>ID</b><span class="mut">' + esc(p.id) + '</span></div>';
+  h += '<h3>Ações</h3><div class="row"><input id="pm" placeholder="Mensagem privada"><button class="small" onclick="act({a:\'whisper\',pid:\'' + id + '\',msg:$(\'pm\').value},\'Mensagem enviada.\')">Enviar</button></div>';
+  h += '<div class="row" style="margin-top:8px"><button class="ghost small" onclick="act({a:\'heal\',pid:\'' + id + '\'},\'Curado.\')">❤️ Curar/Reviver</button><select id="tpz">' + ZONES.map((z, i) => '<option value="' + i + '">' + esc(z.name) + '</option>').join('') + '</select><button class="ghost small" onclick="act({a:\'tp\',pid:\'' + id + '\',z:+$(\'tpz\').value},\'Teleportado.\')">🌀 Teleportar</button></div>';
+  h += '<div class="row" style="margin-top:8px"><input id="gg" type="number" min="0" placeholder="Ouro" style="max-width:100px"><input id="gx" type="number" min="0" placeholder="XP" style="max-width:100px"><select id="gi"><option value="">— item —</option>' + Object.keys(ITEMS).map(k => '<option value="' + k + '">' + esc(ITEMS[k].icon + ' ' + ITEMS[k].name) + '</option>').join('') + '</select><input id="gq" type="number" min="1" value="1" style="max-width:64px"><button class="small" onclick="giveTo(\'' + id + '\')">🎁 Dar</button></div>';
+  h += '<p class="hint">Curar, teleportar e dar itens só funcionam com o jogador online.</p>';
+  h += '<div class="row"><button class="ghost small" onclick="act({a:\'kick\',pid:\'' + id + '\'},\'Expulso.\')">Expulsar</button><button class="ghost small" onclick="act({a:\'mute\',pid:\'' + id + '\',on:' + !p.mute + '},\'' + (p.mute ? 'Chat liberado.' : 'Silenciado.') + '\')">' + (p.mute ? '🔊 Liberar chat' : '🔇 Silenciar') + '</button>' + (p.ban ? '<button class="small" onclick="act({a:\'ban\',pid:\'' + id + '\',on:false},\'Ban removido.\')">Remover ban</button>' : '<button class="danger small" onclick="banP(\'' + id + '\')">⛔ Banir</button>') + '</div>';
+  h += '<h3>Skins</h3><div class="row">' + skins + '</div>';
+  h += '<h3>Anotação</h3><textarea id="pnote" rows="2" placeholder="Só os ADMs veem isto">' + esc(p.note || '') + '</textarea><div class="row" style="margin-top:6px"><button class="ghost small" onclick="act({a:\'note\',pid:\'' + id + '\',text:$(\'pnote\').value},\'Anotação salva.\')">Salvar anotação</button></div>';
+  if (zt.length) { const mx = zt[0][1]; h += '<h3>Onde passa o tempo</h3>' + zt.map(([z, s]) => '<div style="margin:4px 0">' + bar(s, mx, esc(zn(+z)) + ' · ' + dur(s)) + '</div>').join(''); }
+  const tl = d.events.map(e => ({ ts: e.ts, h: evText(e) })).concat(d.sessions.flatMap(s => [{ ts: s.s, h: '<span class="mut">🔌 Conectou</span>' }, { ts: s.e, h: '<span class="mut">🚪 Saiu depois de ' + dur((s.e - s.s) / 1000) + (s.act ? ' (' + dur(s.act) + ' ativo)' : '') + '</span>' }])).sort((a, b) => b.ts - a.ts).slice(0, 300);
+  h += '<h3>Linha do tempo</h3><div class="feed">' + (tl.length ? tl.map(x => '<div><time>' + dt(x.ts) + '</time>' + x.h + '</div>').join('') : '<div class="empty">Sem eventos ainda.</div>') + '</div>';
+  h += '<h3>Zona de perigo</h3><p class="hint">Apaga as estatísticas deste jogador do painel (não apaga o save do jogo).</p><button class="ghost small" onclick="forgetP(\'' + id + '\')">Apagar dados do painel</button>';
+  $('drawer').innerHTML = h;
+}
+window.openPlayer = openPlayer;
+function nkey(n) { return [...String(n || '').toLowerCase().trim()].map(c => /[a-z0-9]/.test(c) ? c : '_' + c.codePointAt(0).toString(16)).join('').slice(0, 120) || '_'; }
+window.closeDrawer = () => { OPEN = null; $('drawer').classList.remove('open'); $('shade').classList.remove('open'); };
+$('shade').onclick = closeDrawer;
+window.giveTo = id => act({ a: 'give', pid: id, gold: +$('gg').value || 0, xp: +$('gx').value || 0, item: $('gi').value, q: +$('gq').value || 1 }, 'Presente enviado.');
+window.banP = id => { const p = ST.players[id], why = prompt('Banir ' + (p.n || 'jogador') + '. Motivo (opcional):', ''); if (why === null) return; const ip = confirm('Banir também a conexão (IP) dele? Isso impede que ele volte criando outro personagem no mesmo aparelho/rede.\n\nOK = sim · Cancelar = só a conta'); act({ a: 'ban', pid: id, on: true, msg: why, ip }, 'Jogador banido.'); };
+window.forgetP = id => { const p = ST.players[id], c = prompt('Para confirmar, digite o nome do jogador: ' + (p.n || '')); if (c === null) return; act({ a: 'forget', pid: id, confirm: c }, 'Dados apagados.').then(ok => ok && closeDrawer()); };
+
+/* ---------- Funil ---------- */
+function funnelSteps() {
+  const P = players(), steps = [];
+  const add = (label, n, zone, extra) => { const prev = steps.length ? steps[steps.length - 1].n : n; steps.push({ i: steps.length, label, n, prev, drop: Math.max(0, prev - n), zone, extra }); };
+  add('Abriram o jogo', P.length, -1); add('Criaram personagem', P.filter(p => p.n).length, -1);
+  for (const q of QUESTS) { const acc = P.filter(p => p.q && p.q[q.id]).length, done = P.filter(p => p.q && p.q[q.id] && p.q[q.id].t != null).length; add(q.name, done, q.zone, { acc, q }); }
+  return steps;
+}
+VIEWS.funil = () => {
+  const st = funnelSteps(), top = st[0].n || 1, worst = new Set(st.filter(s => s.i > 1 && s.drop > 0).sort((a, b) => b.drop - a.drop).slice(0, 3).map(s => s.i));
+  let h = '<div class="card"><h2>🔻 Funil de progresso <small>quantos jogadores chegam a cada etapa da história</small></h2><p class="hint">Cada barra mostra quantos <b>entregaram</b> aquela missão. Em vermelho, as 3 etapas onde mais gente parou. "Aceitaram" mostra quem começou mas pode não ter terminado.</p><div class="fun">';
+  let lastZ = null;
+  for (const s of st) {
+    if (s.zone !== lastZ && s.zone >= 0) { h += '<div class="zh">' + esc(zn(s.zone)) + '</div>'; lastZ = s.zone; }
+    const cls = worst.has(s.i) ? 'r' : '';
+    h += '<div class="lb" title="' + esc(s.label) + '">' + (s.extra ? '' : '<b>') + esc(s.label) + (s.extra ? '' : '</b>') + '</div>' + bar(s.n, top, s.n + ' · ' + pct(s.n, top) + '%' + (s.extra && s.extra.acc > s.n ? ' <span class="mut">(' + s.extra.acc + ' aceitaram)</span>' : ''), cls) + '<div class="dr ' + (s.drop ? 'bad' : 'mut') + '">' + (s.i && s.drop ? '−' + s.drop + ' (' + pct(s.drop, s.prev) + '%)' : '') + '</div>';
+  }
+  h += '</div></div>';
+  const P = players().filter(p => p.n), L = [1, 3, 5, 7, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60];
+  h += '<div class="card" style="margin-top:14px"><h2>📶 Funil por nível <small>maior nível que cada jogador já alcançou</small></h2><div class="fun">';
+  let prev = P.length;
+  for (const l of L) { const n = P.filter(p => p.maxL >= l).length; h += '<div class="lb">Nível ' + l + '+</div>' + bar(n, P.length || 1, n + ' · ' + pct(n, P.length) + '%', 'g') + '<div class="dr ' + (prev - n ? 'bad' : 'mut') + '">' + (prev - n ? '−' + (prev - n) : '') + '</div>'; prev = n; }
+  return h + '</div></div>';
+};
+
+/* ---------- Missões ---------- */
+VIEWS.missoes = () => {
+  const qs = questStats(); const rows = QUESTS.map(q => qs[q.id]).filter(r => r.acc || r.active.length);
+  const allMed = rows.map(r => r.med).filter(x => x != null), gMed = median(allMed);
+  let h = '<div class="card"><h2>📜 Tempo em cada missão <small>tempo de jogo ativo entre aceitar e entregar</small></h2><p class="hint">"Presos agora" = jogadores ativos que estão nessa missão há mais que o dobro do tempo normal (mínimo 15 min). "Largaram aqui" = estavam nessa missão e não voltam há ' + CHURN_DAYS + '+ dias. Missões muito mais longas que as outras (em amarelo) costumam parecer repetitivas.</p>';
+  if (!rows.length) return h + '<div class="empty">Ainda não há dados de missões. Eles aparecem conforme o pessoal joga.</div></div>';
+  const mx = Math.max(...rows.map(r => r.med || 0), 1);
+  h += '<div class="tw"><table><tr><th>Missão</th><th class="num">Aceitaram</th><th class="num">Entregaram</th><th style="min-width:180px">Tempo típico</th><th class="num">Mais lento</th><th class="num">Mortes (média)</th><th class="num">Presos agora</th><th class="num">Largaram aqui</th></tr>';
+  for (const r of rows) {
+    const slow = r.med != null && gMed && r.med > gMed * 2, dm = r.deaths.length ? (r.deaths.reduce((a, b) => a + b, 0) / r.deaths.length) : null;
+    h += '<tr><td><b>' + esc(r.q.name) + '</b><div class="mut" style="font-size:12px">' + esc(zn(r.q.zone)) + ' · nível ' + r.q.reqLvl + '</div></td><td class="num">' + r.acc + '</td><td class="num">' + r.done + '</td><td>' + (r.med != null ? bar(r.med, mx, dur(r.med) + (r.times.length > 1 ? ' <span class="mut">(' + r.times.length + ' jog.)</span>' : ''), slow ? 'y' : '') : '<span class="mut">—</span>') + '</td><td class="num">' + (r.times.length ? dur(Math.max(...r.times)) : '—') + '</td><td class="num ' + (dm != null && dm >= 3 ? 'bad' : '') + '">' + (dm != null ? dm.toFixed(1) : '—') + '</td><td class="num ' + (r.stuck.length ? 'warn' : 'mut') + '">' + r.stuck.length + '</td><td class="num ' + (r.aband ? 'bad' : 'mut') + '">' + r.aband + '</td></tr>';
+  }
+  h += '</table></div></div>';
+  const stuck = Object.values(qs).flatMap(r => r.active.map(a => Object.assign({ r }, a))).filter(a => a.el != null).sort((a, b) => b.el - a.el);
+  h += '<div class="card" style="margin-top:14px"><h2>⏳ Quem está em qual missão agora</h2>';
+  if (!stuck.length) h += '<div class="empty">Ninguém com missão em andamento.</div>';
+  else h += '<div class="tw"><table><tr><th>Jogador</th><th>Missão</th><th class="num">Há quanto tempo</th><th class="num">Normal</th><th class="num">Mortes nela</th><th>Situação</th></tr>' + stuck.map(a => '<tr class="click" onclick="openPlayer(\'' + a.p.id + '\')"><td><b>' + esc(a.p.n) + '</b></td><td>' + esc(a.r.q.name) + '</td><td class="num">' + dur(a.el) + '</td><td class="num">' + (a.r.med != null ? dur(a.r.med) : '—') + '</td><td class="num">' + (a.deaths != null ? a.deaths : '—') + '</td><td>' + (churned(a.p) ? '<span class="bad">largou o jogo (' + ago(a.p.last) + ')</span>' : a.el > a.r.limit ? '<span class="warn">preso</span>' : '<span class="good">normal</span>') + '</td></tr>').join('') + '</table></div>';
+  return h + '</div>';
+};
+
+/* ---------- Onde saem ---------- */
+VIEWS.saidas = () => {
+  const P = players().filter(p => p.n), ch = P.filter(churned);
+  let h = '<div class="card"><h2>🚪 Onde os jogadores largam o jogo <span class="sp"></span><small>considerar "sumiu" após</small><select onchange="CHURN_DAYS=+this.value;render()">' + [1, 2, 3, 5, 7, 14].map(d => '<option value="' + d + '"' + (d === CHURN_DAYS ? ' selected' : '') + '>' + d + ' dia' + (d > 1 ? 's' : '') + '</option>').join('') + '</select></h2>';
+  h += '<p class="hint">Jogadores que não voltam há ' + CHURN_DAYS + '+ dias, agrupados pelo ponto onde estavam na última vez. É aqui que o jogo provavelmente ficou chato, difícil ou repetitivo.</p>';
+  if (!ch.length) h += '<div class="empty">Ninguém sumiu ainda (com ' + P.length + ' jogador(es) no total).</div>';
+  else {
+    const by = {}; for (const p of ch) { const q = curQuest(p), k = q ? 'q:' + q : 'z:' + p.z; (by[k] = by[k] || []).push(p); }
+    const rows = Object.entries(by).sort((a, b) => b[1].length - a[1].length), mx = rows[0][1].length;
+    h += '<div class="fun">' + rows.map(([k, list]) => '<div class="lb">' + (k[0] === 'q' ? '📜 ' + esc(qn(k.slice(2))) : '🗺️ ' + esc(zn(+k.slice(2))) + ' <span class="mut">(sem missão)</span>') + '</div>' + bar(list.length, mx, list.length + ' jogador(es): ' + esc(list.map(p => p.n).join(', ')), 'r') + '<div class="dr mut">nív. ' + Math.round(list.reduce((a, p) => a + p.lvl, 0) / list.length) + '</div>').join('') + '</div>';
+    h += '<div class="tw" style="margin-top:14px"><table><tr><th>Jogador</th><th class="num">Nível</th><th>Última missão</th><th>Zona</th><th class="num">Tempo total</th><th>Última ação</th><th>Sumiu</th></tr>' + ch.sort((a, b) => b.last - a.last).map(p => { const le = lastEv(p.id); return '<tr class="click" onclick="openPlayer(\'' + p.id + '\')"><td><b>' + esc(p.n) + '</b></td><td class="num">' + p.lvl + '</td><td>' + esc(curQuest(p) ? qn(curQuest(p)) : '—') + '</td><td>' + esc(zn(p.z)) + '</td><td class="num">' + dur(p.play) + '</td><td>' + (le ? evText(le) : '—') + '</td><td>' + ago(p.last) + '</td></tr>'; }).join('') + '</table></div>';
+  }
+  h += '</div>';
+  const ss = ST.sessions.slice(-600), byQ = {};
+  for (const s of ss) { const k = s.q ? qn(s.q) : zn(s.z) + ' (sem missão)'; byQ[k] = byQ[k] || { n: 0, t: 0 }; byQ[k].n++; byQ[k].t += (s.e - s.s) / 1000; }
+  const rq = Object.entries(byQ).sort((a, b) => b[1].n - a[1].n).slice(0, 12), mq = rq.length ? rq[0][1].n : 1;
+  h += '<div class="card" style="margin-top:14px"><h2>🔌 Onde as sessões terminam <small>últimas ' + ss.length + ' vezes que alguém fechou o jogo</small></h2><p class="hint">Mostra em que ponto as pessoas costumam fechar o jogo em cada sessão, mesmo quem volta depois. Um ponto que aparece muito pode ser um "muro" que cansa.</p>';
+  h += rq.length ? '<div class="fun">' + rq.map(([k, v]) => '<div class="lb">' + esc(k) + '</div>' + bar(v.n, mq, v.n + ' sessões · média ' + dur(v.t / v.n)) + '<div></div>').join('') + '</div>' : '<div class="empty">Sem sessões registradas ainda.</div>';
+  const lens = ss.map(s => (s.e - s.s) / 60000), bk = [[0, 5, '< 5 min'], [5, 15, '5–15 min'], [15, 30, '15–30 min'], [30, 60, '30–60 min'], [60, 120, '1–2 h'], [120, 1e9, '2 h+']];
+  const bc = bk.map(([a, b]) => lens.filter(x => x >= a && x < b).length), bm = Math.max(1, ...bc);
+  h += '<h2 style="margin-top:18px">⏱️ Duração das sessões</h2><div class="fun">' + bk.map((b, i) => '<div class="lb">' + b[2] + '</div>' + bar(bc[i], bm, bc[i] + ' (' + pct(bc[i], lens.length) + '%)', i === 0 ? 'y' : '') + '<div></div>').join('') + '</div><p class="hint">Muitas sessões curtas (< 5 min) podem indicar que o começo não prende, ou problemas de conexão.</p></div>';
+  return h;
+};
+function lastEv(pid) { for (let i = ST.events.length - 1; i >= 0; i--) if (ST.events[i].p === pid && ST.events[i].e !== 'adm') return ST.events[i]; return null; }
+
+/* ---------- Atividade ---------- */
+VIEWS.atividade = () => {
+  const ss = ST.sessions, hours = new Array(24).fill(0); for (const s of ss) hours[new Date(s.s).getHours()]++; ST.online.forEach(o => hours[new Date(o.since).getHours()]++);
+  const hm2 = Math.max(1, ...hours);
+  let h = '<div class="grid g2"><div class="card"><h2>🕐 Horário em que entram <small>no seu fuso</small></h2><div class="hist">' + hours.map((v, i) => '<div title="' + i + 'h: ' + v + ' entradas" style="height:' + (v / hm2 * 100) + '%"></div>').join('') + '</div><div class="hl">' + hours.map((v, i) => '<span>' + (i % 3 ? '' : i + 'h') + '</span>').join('') + '</div></div>';
+  const days = []; for (let i = 13; i >= 0; i--) { const d = new Date(ST.now - i * 864e5); d.setHours(0, 0, 0, 0); days.push(d.getTime()); }
+  const dau = days.map(d0 => { const d1 = d0 + 864e5, s = new Set(ss.filter(x => x.s < d1 && x.e >= d0).map(x => x.p)); if (ST.now >= d0 && ST.now < d1) ST.online.forEach(o => s.add(o.id)); return s.size; }), dm = Math.max(1, ...dau);
+  h += '<div class="card"><h2>📅 Jogadores por dia <small>últimos 14 dias</small></h2><div class="hist">' + dau.map((v, i) => '<div title="' + new Date(days[i]).toLocaleDateString('pt-BR') + ': ' + v + ' jogador(es)" style="height:' + (v / dm * 100) + '%;background:var(--good)"></div>').join('') + '</div><div class="hl">' + days.map((d, i) => '<span>' + (i % 2 ? '' : new Date(d).getDate()) + '</span>').join('') + '</div></div></div>';
+  const zt = {}; for (const p of players()) for (const z in p.zt || {}) zt[z] = (zt[z] || 0) + p.zt[z];
+  const zr = Object.entries(zt).sort((a, b) => b[1] - a[1]), zm = zr.length ? zr[0][1] : 1, ztot = zr.reduce((a, b) => a + b[1], 0);
+  h += '<div class="grid g2" style="margin-top:14px"><div class="card"><h2>🗺️ Onde passam o tempo <small>tempo ativo somado</small></h2>' + (zr.length ? zr.map(([z, s]) => '<div style="margin:5px 0">' + bar(s, zm, esc(zn(+z)) + ' · ' + dur(s) + ' (' + pct(s, ztot) + '%)') + '</div>').join('') : '<div class="empty">Sem dados ainda.</div>') + '<p class="hint">Se uma zona concentra tempo demais para o tamanho dela, é provável que seja onde o jogo fica repetitivo (muito "grind").</p></div>';
+  const E = ST.events, cnt = k => E.filter(e => e.e === k).length, npc = {}, dth = {};
+  for (const e of E) { if (e.e === 'npc') npc[e.d.k] = (npc[e.d.k] || 0) + 1; if (e.e === 'death') { const k = (e.d.m || '?'); dth[k] = (dth[k] || 0) + 1; } }
+  const enh = E.filter(e => e.e === 'enh'), enhOk = enh.filter(e => e.d.ok).length;
+  h += '<div class="card"><h2>🎮 O que fazem <small>últimos ' + E.length + ' eventos</small></h2><div class="kv">' + [['Missões entregues', cnt('qt')], ['Níveis ganhos', cnt('lvl')], ['Chefes derrotados', cnt('boss')], ['Mortes', cnt('death')], ['Reforços', enh.length ? enh.length + ' (' + pct(enhOk, enh.length) + '% sucesso)' : 0], ['Forjas', cnt('forge')], ['Poções preparadas', cnt('brew')], ['Melhorias de asas', cnt('wings')], ['Teleportes', cnt('tp')]].map(([k, v]) => '<b>' + k + '</b><span>' + v + '</span>').join('') + '</div>';
+  const nr = Object.entries(npc).sort((a, b) => b[1] - a[1]); if (nr.length) h += '<h2 style="margin-top:14px">💬 NPCs mais visitados</h2>' + nr.map(([k, v]) => '<div style="margin:4px 0">' + bar(v, nr[0][1], esc(NPCN(k)) + ' · ' + v) + '</div>').join('');
+  const dr = Object.entries(dth).sort((a, b) => b[1] - a[1]).slice(0, 8); if (dr.length) h += '<h2 style="margin-top:14px">💀 Quem mais mata jogadores</h2>' + dr.map(([k, v]) => '<div style="margin:4px 0">' + bar(v, dr[0][1], esc(mn(k)) + ' · ' + v + ' mortes', 'r') + '</div>').join('') + '<p class="hint">Um monstro comum no topo pode estar forte demais para o nível da zona.</p>';
+  return h + '</div></div>';
+};
+
+/* ---------- Linha do tempo ---------- */
+function feedRows(list) { return list.length ? list.map(e => '<div><time>' + dt(e.ts) + '</time><a href="#" onclick="openPlayer(\'' + e.p + '\');return false"><b>' + esc(e.n || '?') + '</b></a> <span class="mut">nív. ' + e.l + '</span> · ' + evText(e) + '</div>').join('') : '<div class="empty">Nada por aqui ainda.</div>'; }
+VIEWS.linha = () => {
+  const P = players().filter(p => p.n).sort((a, b) => a.n.localeCompare(b.n));
+  const types = [['', 'Todos os eventos'], ['qa,qr,qt', 'Missões'], ['lvl', 'Níveis'], ['zone,tp', 'Zonas'], ['death', 'Mortes'], ['boss', 'Chefes'], ['npc', 'NPCs'], ['enh,forge,brew,wings', 'Forja/Alquimia/Asas'], ['start', 'Entradas'], ['adm', 'Ações de ADM']];
+  const tset = FEED_E ? new Set(FEED_E.split(',')) : null;
+  const list = ST.events.filter(e => (!FEED_P || e.p === FEED_P) && (!tset || tset.has(e.e))).slice(-400).reverse();
+  return '<div class="card"><h2>🕒 Linha do tempo <span class="sp"></span><select onchange="FEED_P=this.value;render()"><option value="">Todos os jogadores</option>' + P.map(p => '<option value="' + p.id + '"' + (p.id === FEED_P ? ' selected' : '') + '>' + esc(p.n) + '</option>').join('') + '</select><select onchange="FEED_E=this.value;render()">' + types.map(([k, n]) => '<option value="' + k + '"' + (k === FEED_E ? ' selected' : '') + '>' + n + '</option>').join('') + '</select></h2><div class="feed" style="max-height:none">' + feedRows(list) + '</div></div>';
+};
+
+/* ---------- Chat ---------- */
+VIEWS.chat = () => {
+  const list = ST.chat.slice(-250).reverse();
+  return '<div class="card"><h2>💬 Chat do jogo <small>últimas mensagens</small></h2><div class="row" style="margin-bottom:12px"><input id="ann" maxlength="200" placeholder="Falar como ADM para todos"><button onclick="annSend()">Enviar</button></div><div class="feed" style="max-height:none">' + (list.length ? list.map(c => { const p = ST.players[c.p]; return '<div><time>' + dt(c.ts) + '</time>' + (c.p === 'adm' ? '<b class="gold">📢 ADM</b>' : '<a href="#" onclick="openPlayer(\'' + c.p + '\');return false"><b>' + esc(c.n) + '</b></a>') + (c.k === 1 ? ' <span class="mut">' + esc(c.m) + '</span>' : ': ' + esc(c.m)) + (p && c.p !== 'adm' ? (p.mute ? ' <span class="tag mute">mudo</span>' : ' <button class="ghost small" style="padding:1px 7px" onclick="act({a:\'mute\',pid:\'' + c.p + '\',on:true},\'Silenciado.\')">silenciar</button>') : '') + '</div>'; }).join('') : '<div class="empty">Sem mensagens ainda.</div>') + '</div></div>';
+};
+
+/* ---------- Servidor ---------- */
+VIEWS.servidor = () => {
+  const s = ST.server, st = s.store, S2 = ST.settings, ipb = Object.entries(ST.ipBans || {});
+  let h = '<div class="grid g2"><div class="card"><h2>🛠️ Manutenção</h2><p class="hint">Com a manutenção ligada, ninguém consegue entrar (você continua entrando se já tiver usado /adm neste navegador).</p><input id="mmsg" style="width:100%" maxlength="200" placeholder="Mensagem (ex.: Atualizando o jogo, voltamos às 21h)" value="' + esc(S2.maintMsg) + '"><div class="row" style="margin-top:8px">' + (S2.maint ? '<span class="tag ban">LIGADA</span><button onclick="act({a:\'maint\',on:false},\'Manutenção desligada.\')">Desligar manutenção</button>' : '<span class="tag on">desligada</span><button class="ghost" onclick="act({a:\'maint\',on:true,msg:$(\'mmsg\').value},\'Manutenção ligada.\')">Ligar</button><button class="danger" onclick="if(confirm(\'Ligar manutenção e desconectar todos agora?\'))act({a:\'maint\',on:true,kick:true,msg:$(\'mmsg\').value},\'Todos desconectados.\')">Ligar e desconectar todos</button>') + '</div>';
+  h += '<h2 style="margin-top:18px">📌 Mensagem de boas-vindas</h2><p class="hint">Aparece no chat para cada jogador que entra.</p><div class="row"><input id="motd" maxlength="200" value="' + esc(S2.motd) + '" placeholder="Ex.: Bem-vindo! Evento de fim de semana ativo."><button class="ghost" onclick="act({a:\'motd\',msg:$(\'motd\').value},\'Salvo.\')">Salvar</button></div></div>';
+  h += '<div class="card"><h2>💾 Onde os dados ficam</h2>';
+  if (st.mode === 'gist') h += '<div class="kv"><b>Modo</b><span class="good">GitHub Gist (permanente)</span><b>Gist</b><span>' + esc(st.gistId || '—') + '</span><b>Último envio</b><span>' + (st.lastSync ? dt(st.lastSync) : 'ainda não') + '</span>' + (st.err ? '<b>Erro</b><span class="bad">' + esc(st.err) + '</span>' : '') + '</div><div class="row" style="margin-top:10px"><button class="ghost small" onclick="act({a:\'sync\'},\'Enviando…\')">Salvar agora</button></div>';
+  else h += '<p><span class="warn">⚠️ Modo temporário.</span> Os dados ficam só no disco do servidor. No plano gratuito do Render eles <b>somem</b> quando o servidor dorme (15 min sem jogadores) ou reinicia.</p><p class="hint">Para guardar tudo de forma permanente e grátis, crie um token do GitHub com permissão <b>gist</b> e coloque na variável <code>GITHUB_TOKEN</code> do Render. O passo a passo está no README.</p>';
+  h += '<div class="kv" style="margin-top:14px"><b>Servidor ligado desde</b><span>' + dt(s.started) + '</span><b>Dados desde</b><span>' + dt(s.dataSince) + '</span><b>Memória</b><span>' + s.mem + ' MB</span><b>Node</b><span>' + esc(s.node) + '</span><b>Eventos guardados</b><span>' + ST.events.length + '</span><b>Sessões guardadas</b><span>' + ST.sessions.length + '</span></div></div></div>';
+  h += '<div class="grid g2" style="margin-top:14px"><div class="card"><h2>⛔ Banidos</h2>';
+  const bans = players().filter(p => p.ban);
+  h += bans.length ? bans.map(p => '<div class="row" style="margin:6px 0"><b style="flex:1">' + esc(p.n) + '</b><span class="mut">' + esc(p.banMsg || '') + '</span><button class="ghost small" onclick="act({a:\'ban\',pid:\'' + p.id + '\',on:false},\'Ban removido.\')">Remover</button></div>').join('') : '<div class="mut">Ninguém banido.</div>';
+  if (ipb.length) h += '<h2 style="margin-top:14px">Conexões (IP) bloqueadas</h2>' + ipb.map(([k, v]) => '<div class="row" style="margin:6px 0"><span style="flex:1">' + esc(v.n || '?') + ' <span class="mut">#' + esc(k) + '</span></span><button class="ghost small" onclick="act({a:\'unbanip\',h:\'' + k + '\'},\'Liberado.\')">Liberar</button></div>').join('');
+  h += '</div><div class="card"><h2>🧹 Limpar estatísticas</h2><p class="hint">Use depois dos seus testes, para o funil mostrar só jogadores de verdade. Apaga eventos, sessões, chat e tempos das missões. <b>Não</b> apaga personagens, saves, skins nem bans.</p><button class="danger" onclick="const c=prompt(\'Digite APAGAR para confirmar\');if(c)act({a:\'wipeStats\',confirm:c},\'Estatísticas zeradas.\')">Zerar estatísticas</button></div></div>';
+  return h;
+};
+
+if (TOK) refresh(); else showLogin();
+</script>
+</body>
+</html>

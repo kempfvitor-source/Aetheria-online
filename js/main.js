@@ -68,8 +68,19 @@ function setupInput() {
   });
   window.addEventListener('keyup', e => { G.keys[e.code] = false; });
   window.addEventListener('blur', () => { G.keys = {}; G.input.x = G.input.y = 0; });
+  // margem de segurança: cliques no mapa perto da interface não fazem o personagem andar
+  const HUD_SEL = '#pframe,#tframe,#topright,#menu,#menubtn,#tracker>div,#chat,#chatbtn,#bottom,#prompt,#joy,#tact>*,#wins .win';
+  const nearHud = e => {
+    const pad = UI.touch ? 22 : 30, x = e.clientX, y = e.clientY;
+    for (const el of document.querySelectorAll(HUD_SEL)) {
+      if (!el.offsetParent && getComputedStyle(el).position !== 'fixed') continue; const r = el.getBoundingClientRect(); if (r.width < 2 || r.height < 2) continue;
+      if (x >= r.left - pad && x <= r.right + pad && y >= r.top - pad && y <= r.bottom + pad) return true;
+    }
+    return false;
+  };
   cv.addEventListener('pointerdown', e => {
     if (!G.started || P.dead) return; Sfx.unlock(); if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    if (nearHud(e)) { $('menu').classList.remove('open'); return; }
     $('menu').classList.remove('open');
     const sp = stagePt(e), w = screenToWorld(sp.x, sp.y), hit = pickAt(w.x, w.y);
     if (hit && hit.type === 'mob') { P.target = hit.o; P.engage = true; P.moveTo = null; P.cast = null; }

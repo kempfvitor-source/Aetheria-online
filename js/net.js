@@ -96,6 +96,25 @@ const Net = {
     if (S && !rows.some(r => r.id === this.uid || (r.n === S.name && r.l === S.lvl))) rows.push({ id: 'me', n: S.name, c: S.cls, l: S.lvl, xp: S.xp, p: P.st.power | 0, w: S.wings.t });
     rows.sort((a, b) => b.l - a.l || b.xp - a.xp || b.p - a.p); return rows.slice(0, 50);
   },
+  /* ---- telemetria para o painel ADM (só no servidor próprio) ---- */
+  evq: [],
+  track(e, d) {
+    if (this.mode !== 'ws' && this.ready) return; const m = { t: 'ev', e, d: d || {} };
+    if (this.ws && this.ws.readyState === 1) this.ws.send(JSON.stringify(m)); else if (this.evq.length < 60) this.evq.push(m);
+  },
+  _flushEv() { if (!this.ws || this.ws.readyState !== 1) return; for (const m of this.evq) this.ws.send(JSON.stringify(m)); this.evq = []; },
+  _admCmd(m) {
+    if (!S || !G.started) return;
+    if (m.c === 'give') { const g = m.g || {}; if (g.gold) gainGold(g.gold); if (g.xp) gainXp(g.xp); if (g.item && ITEMS[g.item]) addItem(g.item, g.q || 1); UI.toast('🎁 Presente da Administração' + (m.m ? ': ' + m.m : '!'), 'gold'); Sfx.play('rare'); saveAll(true); UI.dirty.all = 1; }
+    else if (m.c === 'tp' && ZONES[m.z]) { if (P.dead) respawn(false); UI.closeAll(); UI.fade(() => enterZone(m.z, null)); UI.toast('Um ADM teleportou você para ' + ZONES[m.z].name + '.', 'gold'); }
+    else if (m.c === 'heal') { if (P.dead) respawn(false); P.hp = P.st.maxHp; P.mp = P.st.maxMp; UI.dirty.hud = 1; fxPillar(P.x, P.y, '#7dff8a'); UI.toast('Um ADM restaurou sua vida e mana.', 'good'); }
+  },
+  _kicked(msg) {
+    this.kicked = true; try { this.ws && this.ws.close(); } catch (e) { } if (G.started) saveLocal();
+    const d = document.createElement('div'); d.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(8,6,20,.92);color:#fff;font:600 18px/1.5 sans-serif;text-align:center;padding:24px';
+    d.innerHTML = '<div style="max-width:420px"><div style="font-size:42px">⚠️</div><p></p><button style="margin-top:14px;padding:10px 22px;border:0;border-radius:8px;background:#7a4fd0;color:#fff;font:inherit;cursor:pointer">Recarregar</button></div>';
+    d.querySelector('p').textContent = msg || 'Você foi desconectado.'; d.querySelector('button').onclick = () => location.reload(); document.body.appendChild(d);
+  },
   /* ---- skins: concessão por ADM ---- */
   isAdmin: false, gunsub: null, gname: null,
   watchGrants() {
@@ -103,7 +122,7 @@ const Net = {
     if (!this.db) return; this.gname = S.name; if (this.gunsub) { try { this.gunsub(); } catch (e) { } }
     try { this.gunsub = this.db.doc('grants/' + nameKey(S.name)).onSnapshot(snap => { if (snap.metadata && snap.metadata.fromCache) return; const d = snap.exists ? snap.data() : null; applyGrants(d && d.skins); }, () => { this.gname = null; }); } catch (e) { this.gname = null; }
   },
-  admLogin(key) { if (this.ws && this.ws.readyState === 1) this.ws.send(JSON.stringify({ t: 'adm', key })); },
+  admLogin(key) { this._admKey = key; if (this.ws && this.ws.readyState === 1) this.ws.send(JSON.stringify({ t: 'adm', key })); },
   async grant(name, skin, on) {
     name = String(name).trim().slice(0, 16); if (!SKINS[skin] || !name) return;
     if (!this.isAdmin) { UI.log('Apenas ADM pode usar este comando.' + (this.mode === 'ws' ? ' Use /adm <chave>.' : ''), 'sys'); return; }
@@ -118,18 +137,21 @@ const Net = {
       let tok = null; try { tok = localStorage.getItem('aetheria_token'); if (!tok) { tok = Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join(''); localStorage.setItem('aetheria_token', tok); } } catch (e) { tok = 'anon' + Math.random(); }
       let ws; try { ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws'); } catch (e) { return res(); }
       const fail = setTimeout(() => res(), 3000);
-      ws.onopen = () => { this.ws = ws; this.mode = 'ws'; ws.send(JSON.stringify({ t: 'hello', id: tok })); };
+      ws.onopen = () => { this.ws = ws; this.mode = 'ws'; let adm = null; try { adm = localStorage.getItem('aetheria_adm'); } catch (e) { } ws.send(JSON.stringify(adm ? { t: 'hello', id: tok, adm } : { t: 'hello', id: tok })); };
       ws.onmessage = ev => {
         let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
-        if (m.t === 'welcome') { this.wsId = m.pid; this.uid = m.pid; if (m.save && validSave(m.save)) this.cloudSave = m.save; clearTimeout(fail); res(); }
+        if (m.t === 'welcome') { this.wsId = m.pid; this.uid = m.pid; if (m.save && validSave(m.save)) this.cloudSave = m.save; if (m.motd) setTimeout(() => { UI.log('📢 ' + m.motd, 'sys'); }, 1500); clearTimeout(fail); res(); this._flushEv(); }
         else if (m.t === 'peers') { if (m.z === this.zone && Array.isArray(m.list)) this._applyPeers(m.list.filter(p => p[0] !== this.wsId)); this.online = m.on | 0 || 1; UI.netStatus(); }
         else if (m.t === 'chat' && m.id !== this.wsId) this._recv(m.id, String(m.n || '?').slice(0, 16), String(m.m || '').slice(0, 140), m.k | 0);
         else if (m.t === 'skins') applyGrants(m.skins);
-        else if (m.t === 'adm') { this.isAdmin = !!m.ok; UI.log(m.ok ? 'Modo ADM ativado.' : 'Chave de ADM incorreta.', 'sys'); UI.dirty.win = 1; }
+        else if (m.t === 'admmsg') { const t = String(m.m || '').slice(0, 200); UI.log((m.kind === 'pm' ? '🛡️ ADM (privado): ' : '📢 ADM: ') + t, 'r4'); UI.toast((m.kind === 'pm' ? '🛡️ ' : '📢 ') + t, 'gold'); }
+        else if (m.t === 'admcmd') this._admCmd(m);
+        else if (m.t === 'kicked') this._kicked(String(m.m || '').slice(0, 220));
+        else if (m.t === 'adm') { this.isAdmin = !!m.ok; try { if (m.ok && this._admKey) localStorage.setItem('aetheria_adm', this._admKey); } catch (e) { } UI.log(m.ok ? 'Modo ADM ativado.' : 'Chave de ADM incorreta.', 'sys'); UI.dirty.win = 1; }
         else if (m.t === 'granted') UI.log(m.ok ? 'Skin ' + (m.on ? 'concedida a ' : 'removida de ') + m.name + '.' : 'Não foi possível: ' + (m.err || 'sem permissão') + '.', 'sys');
         else if (m.t === 'rank' && this._rankRes) { this._rankRes(Array.isArray(m.list) ? m.list : []); this._rankRes = null; }
       };
-      ws.onclose = () => { if (this.ws === ws) { this.ws = null; this.mode = 'offline'; G.peers.clear(); UI.netStatus(); setTimeout(() => this._wsConnect().then(() => { if (this.ws) { this.lastState = ''; this.isAdmin = false; UI.netStatus(); } }), 4000); } };
+      ws.onclose = () => { if (this.kicked) { this.ws = null; this.mode = 'offline'; return; } if (this.ws === ws) { this.ws = null; this.mode = 'offline'; G.peers.clear(); UI.netStatus(); setTimeout(() => this._wsConnect().then(() => { if (this.ws) { this.lastState = ''; this.isAdmin = false; UI.netStatus(); } }), 4000); } };
       ws.onerror = () => { };
     });
   },

@@ -94,7 +94,7 @@ function enterZone(id, fromId, keepPos) {
   else { P.x = W.entry.x; P.y = W.entry.y; }
   G.mobs = W.spawns.map(spawnMob); for (const n of W.nodes) n.readyAt = 0;
   P.target = null; P.moveTo = null; P.cast = null; P.engage = false; RD.parts.length = 0; RD.projs.length = 0; RD.teles.length = 0; RD.texts.length = 0;
-  G.path = null; G.pathT = 0; G.peers.clear(); Net.setZone(id); UI.zoneBanner(W.Z); UI.dirty.all = 1; saveLocal();
+  G.path = null; G.pathT = 0; G.peers.clear(); Net.setZone(id); Net.track('zone', { z: id }); UI.zoneBanner(W.Z); UI.dirty.all = 1; saveLocal();
 }
 function usePortal(p) {
   const Z = ZONES[p.to]; if (!P.lvlOk(Z)) { UI.toast('Você precisa do nível ' + zoneReq(Z) + ' para entrar em ' + Z.name + '.', 'bad'); return; }
@@ -103,7 +103,7 @@ function usePortal(p) {
 function teleportTo(id) {
   if (id === G.world.id) return; const cost = id === 0 ? 0 : 20 + id * 45;
   if (S.gold < cost) { UI.toast('Ouro insuficiente.', 'bad'); return; }
-  S.gold -= cost; UI.closeAll(); UI.fade(() => enterZone(id, null)); Sfx.play('portal');
+  S.gold -= cost; Net.track('tp', { z: id }); UI.closeAll(); UI.fade(() => enterZone(id, null)); Sfx.play('portal');
 }
 
 /* ---------- Combate ---------- */
@@ -124,7 +124,7 @@ function killMob(m) {
   m.dead = true; m.respawnAt = G.time + (m.def.boss ? 240 : m.elite ? 45 : 14); fxBurst(m.x, m.y - 14, m.def.c, 16, 150); if (m.def.boss) { RD.shake = 14; fxRing(m.x, m.y, 160, '#ffd24a', 0.8); }
   const diff = S.lvl - m.lvl; let xm = diff >= 10 ? 0.1 : diff >= 7 ? 0.35 : diff >= 5 ? 0.7 : 1; if (m.def.boss) xm = Math.max(xm, 0.5);
   gainXp(Math.max(1, Math.round(m.xp * xm))); const gold = Math.round(m.gold * rnd(0.7, 1.3)); gainGold(gold); fxText(m.x, m.y - 6, '+' + gold + ' 🪙', '#ffd24a');
-  S.stats.kills++; if (m.def.boss) { S.stats.bosses++; UI.toast('Chefe derrotado: ' + m.def.name + '!', 'gold'); Net.announce('derrotou ' + m.def.name + '!'); }
+  S.stats.kills++; if (m.def.boss) { S.stats.bosses++; Net.track('boss', { m: m.def.id }); UI.toast('Chefe derrotado: ' + m.def.name + '!', 'gold'); Net.announce('derrotou ' + m.def.name + '!'); }
   dropLoot(m); questEvent('kill', m.def.id);
   if (P.target === m) { P.target = null; if (P.engage) { const n = nearestMob(260, x => x.state === 'chase'); if (n) P.target = n; else P.engage = false; } }
 }
@@ -148,6 +148,7 @@ function gainXp(n) {
     S.xp -= xpNeed(S.lvl); S.lvl++; S.pts += 4; S.sp += 1;
     for (const sk of CLASSES[S.cls].skills) if (S.lvl >= sk.lvl && !S.skills[sk.id]) { S.skills[sk.id] = 1; UI.toast('Nova habilidade: ' + sk.name + '!', 'gold'); }
     recalc(); P.hp = P.st.maxHp; P.mp = P.st.maxMp; fxPillar(P.x, P.y, '#ffd24a'); fxRing(P.x, P.y, 120, '#ffd24a', 0.8); Sfx.play('level');
+    Net.track('lvl', { l: S.lvl });
     UI.toast('Nível ' + S.lvl + '! +4 pontos de atributo, +1 ponto de habilidade.', 'gold'); UI.log('Você alcançou o nível ' + S.lvl + '!', 'sys');
     if (S.lvl === WING_UNLOCK_LVL) UI.toast('A Guardiã Seraphine quer falar com você sobre suas Asas.', 'gold');
     if (S.lvl % 10 === 0) Net.announce('alcançou o nível ' + S.lvl + '!');
@@ -162,9 +163,10 @@ function hurtPlayer(raw, src) {
   if (P.shield > 0) { const ab = Math.min(P.shield, dmg); P.shield -= ab; dmg -= ab; if (dmg <= 0) { fxText(P.x, P.y - 60, 'Absorvido', '#9fe0ff'); return; } }
   P.hp -= dmg; P.lastCombat = G.time; P.cast = null; fxText(P.x, P.y - 58, '-' + fmt(dmg), '#ff6a5a'); Sfx.play('hurt'); UI.dirty.hud = 1;
   if (!P.target && src && !src.dead) { P.target = src; }
-  if (P.hp <= 0) die();
+  if (P.hp <= 0) die(src);
 }
-function die() {
+function die(src) {
+  Net.track('death', { m: src && src.def ? src.def.id : '', z: G.world ? G.world.id : 0 });
   P.hp = 0; P.dead = true; P.target = null; P.engage = false; P.moveTo = null; S.stats.deaths++;
   const loss = S.lvl >= 5 ? Math.min(S.xp, Math.round(xpNeed(S.lvl) * 0.04)) : 0; S.xp -= loss;
   for (const m of G.mobs) if (m.state === 'chase') m.state = 'return';
@@ -288,16 +290,16 @@ function questEvent(type, arg) {
     const q = QUEST_BY_ID[id], o = q.obj, p = S.quests.active[id]; if (p >= o.n) continue;
     if ((type === 'kill' && o.type === 'kill' && o.mob === arg) || (type === 'kill' && o.type === 'drop' && o.mob === arg && Math.random() < o.chance) || (type === 'gather' && o.type === 'gather' && o.tier === arg)) {
       S.quests.active[id] = p + 1; ch = true; if (o.type === 'drop') fxText(P.x, P.y - 90, o.what + ' ' + (p + 1) + '/' + o.n, '#ffe9a8');
-      if (p + 1 >= o.n) { UI.toast('Missão concluída: ' + q.name + '. Volte a um mestre de missões.', 'gold'); Sfx.play('quest'); }
+      if (p + 1 >= o.n) { Net.track('qr', { q: id }); UI.toast('Missão concluída: ' + q.name + '. Volte a um mestre de missões.', 'gold'); Sfx.play('quest'); }
     }
   }
   if (type === 'kill') for (const d of S.daily.list) if (!d.claimed && d.mob === arg && d.prog < d.n) { d.prog++; ch = true; if (d.prog >= d.n) UI.toast('Contrato diário concluído!', 'gold'); }
   if (ch) refreshQuestMark();
 }
-function acceptQuest(id) { const q = QUEST_BY_ID[id]; if (questStatus(q) !== 'available') return; S.quests.active[id] = 0; UI.toast('Missão aceita: ' + q.name + ' — toque em 🧭 para destacar o caminho.', 'good'); Sfx.play('ui'); refreshQuestMark(); }
+function acceptQuest(id) { const q = QUEST_BY_ID[id]; if (questStatus(q) !== 'available') return; S.quests.active[id] = 0; Net.track('qa', { q: id }); UI.toast('Missão aceita: ' + q.name + ' — toque em 🧭 para destacar o caminho.', 'good'); Sfx.play('ui'); refreshQuestMark(); }
 function giveReward(r) { if (r.xp) gainXp(r.xp); if (r.gold) gainGold(r.gold); for (const [id, n] of (r.items || [])) addItem(id, n); }
 function turnInQuest(id) {
-  const q = QUEST_BY_ID[id]; if (questStatus(q) !== 'ready') return; delete S.quests.active[id]; S.quests.done[id] = 1; giveReward(q.reward);
+  const q = QUEST_BY_ID[id]; if (questStatus(q) !== 'ready') return; delete S.quests.active[id]; S.quests.done[id] = 1; Net.track('qt', { q: id }); giveReward(q.reward);
   UI.toast('Recompensa: ' + fmt(q.reward.xp) + ' XP, ' + fmt(q.reward.gold) + ' ouro' + (q.reward.items.length ? ' e itens' : '') + '.', 'gold'); Sfx.play('quest'); refreshQuestMark(); saveAll(true);
 }
 function dailyReward(i) { return { xp: Math.round(xpNeed(S.lvl) * (0.08 + i * 0.03)), gold: 80 + S.lvl * 35 * (i + 1), items: i === 2 ? [['feather', 3], ['stone', 1]] : [['feather', 1 + i]] }; }
@@ -322,7 +324,8 @@ function enhance(e) {
   if (e.enh >= 15) return; const c = enhCost(e);
   if (S.gold < c.gold || countItem('stone') < c.stones) { UI.toast('Faltam materiais ou ouro.', 'bad'); return; }
   S.gold -= c.gold; removeItem('stone', c.stones);
-  if (Math.random() * 100 < ENH_RATE[e.enh]) { e.enh++; S.stats.maxEnh = Math.max(S.stats.maxEnh, e.enh); UI.toast('Sucesso! ' + e.name + ' +' + e.enh, 'gold'); Sfx.play('level'); if (e.enh >= 10) Net.announce('reforçou ' + e.name + ' até +' + e.enh + '!'); }
+  const enhOk = Math.random() * 100 < ENH_RATE[e.enh]; Net.track('enh', { ok: enhOk, l: e.enh + 1 });
+  if (enhOk) { e.enh++; S.stats.maxEnh = Math.max(S.stats.maxEnh, e.enh); UI.toast('Sucesso! ' + e.name + ' +' + e.enh, 'gold'); Sfx.play('level'); if (e.enh >= 10) Net.announce('reforçou ' + e.name + ' até +' + e.enh + '!'); }
   else { if (e.enh >= 7) { e.enh--; UI.toast('Falhou... o item caiu para +' + e.enh + '.', 'bad'); } else UI.toast('O reforço falhou.', 'bad'); Sfx.play('death'); }
   recalc(); UI.dirty.all = 1;
 }
@@ -333,7 +336,7 @@ function forge(t, slot) {
   if (!hasAll(r.need) || S.gold < r.gold) { UI.toast('Faltam materiais ou ouro.', 'bad'); return; }
   if (S.inv.indexOf(null) < 0) { UI.toast('Mochila cheia!', 'bad'); return; }
   for (const [id, q] of r.need) removeItem(id, q); S.gold -= r.gold;
-  const e = genEquip(r.ilvl, { slot, bonus: Math.min(0.6, 0.25 + pr.l * 0.007), minR: 1 }); addEquip(e); gainProf('smithing', 25 + t * 18); S.stats.crafts++;
+  const e = genEquip(r.ilvl, { slot, bonus: Math.min(0.6, 0.25 + pr.l * 0.007), minR: 1 }); addEquip(e); Net.track('forge', { k: slot }); gainProf('smithing', 25 + t * 18); S.stats.crafts++;
   UI.toast('Forjou [' + RARITY[e.r].n + '] ' + e.name + '!', e.r >= 3 ? 'gold' : 'good'); Sfx.play(e.r >= 3 ? 'rare' : 'gather'); UI.dirty.all = 1;
 }
 function stoneRecipe(t) { return { need: [['ore' + t, 12]], gold: 120 + t * 40, lvl: tierReq(t) }; }
@@ -348,13 +351,13 @@ function brew(i) {
   const r = ALCH[i]; if (S.prof.alchemy.l < r.lvl) { UI.toast('Alquimia nível ' + r.lvl + ' necessário.', 'bad'); return; }
   if (!hasAll(r.need) || S.gold < (r.gold || 0)) { UI.toast('Faltam materiais.', 'bad'); return; }
   for (const [id, q] of r.need) removeItem(id, q); S.gold -= r.gold || 0; if (!addItem(r.out[0], r.out[1])) return;
-  gainProf('alchemy', 14 + r.lvl * 2.2); S.stats.crafts++; UI.toast('Preparou ' + ITEMS[r.out[0]].name + ' x' + r.out[1] + '.', 'good'); Sfx.play('potion'); UI.dirty.all = 1;
+  gainProf('alchemy', 14 + r.lvl * 2.2); Net.track('brew', { k: r.out[0] }); S.stats.crafts++; UI.toast('Preparou ' + ITEMS[r.out[0]].name + ' x' + r.out[1] + '.', 'good'); Sfx.play('potion'); UI.dirty.all = 1;
 }
 function wingsUnlock() { if (S.wings.t > 0 || S.lvl < WING_UNLOCK_LVL) return; S.wings = { t: 1, s: 0 }; recalc(); fxPillar(P.x, P.y, '#fff'); UI.toast('Suas Asas despertaram!', 'gold'); Sfx.play('level'); Net.announce('despertou suas Asas!'); UI.dirty.all = 1; }
 function wingsUpgrade() {
   const w = S.wings; if (!w.t || (w.t >= 10 && w.s >= 10)) return; const c = wingCost(w.t);
   if (countItem('feather') < c.feathers || S.gold < c.gold) { UI.toast('Faltam Penas Etéreas ou ouro.', 'bad'); return; }
-  removeItem('feather', c.feathers); S.gold -= c.gold; w.s++;
+  removeItem('feather', c.feathers); S.gold -= c.gold; w.s++; Net.track('wings', { l: w.t * 10 + w.s });
   if (w.s >= 10 && w.t < 10) { w.t++; w.s = 0; fxPillar(P.x, P.y, WINGS[w.t].c2); UI.toast('Suas asas evoluíram: ' + WINGS[w.t].name + '!', 'gold'); Sfx.play('level'); Net.announce('evoluiu para ' + WINGS[w.t].name + '!'); } else Sfx.play('gather');
   recalc(); UI.dirty.all = 1;
 }
@@ -415,6 +418,7 @@ function startGame(save) {
   S = save; if (!S.skins) S.skins = {}; if (S.skin && !S.skins[S.skin]) S.skin = null; if (!S.opts) S.opts = { sfx: true }; if (!S.disc) S.disc = { 0: 1 }; if (S.inv.length < INV_SIZE) while (S.inv.length < INV_SIZE) S.inv.push(null);
   for (const k in PROFS) if (!S.prof[k]) S.prof[k] = { l: 1, xp: 0 };
   P.buffs = []; P.cds = {}; P.dead = false; P.hp = 1e9; P.mp = 1e9; recalc(); P.hp = P.st.maxHp; P.mp = P.st.maxMp;
+  Net.track('start', { nw: (S.stats.played || 0) < 3, l: S.lvl });
   G.started = true; Net.watchGrants(); enterZone(ZONES[S.zone] ? S.zone : 0, null, true); checkDaily(); UI.start(); Net.pushRank();
 }
 

@@ -90,6 +90,7 @@ const UI = {
   closeAll() { this.wins = []; this.npc = null; this.buildWins(); $('menu').classList.remove('open'); this.closeModal(); },
   toggle(id) { if (this.wins.includes(id)) this.close(id); else this.open(id, null); },
   openNpc(key) {
+    Net.track('npc', { k: key });
     if (key === 'quest' || key === 'scout') { this.tab.quests = 'main'; this.open('quests', key); }
     else if (key === 'smith') this.open('smith', key); else if (key === 'alch') this.open('alch', key); else if (key === 'merchant') this.open('merchant', key);
     else if (key === 'wings') this.open('wings', key); else if (key === 'cash') this.open('cash', key); else if (key === 'tele') this.open('map', key);

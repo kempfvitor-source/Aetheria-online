@@ -48,9 +48,35 @@ na janela "Visuais". Para criar novas skins: adicione em `SKINS` (js/data.js) e 
 1. Envie o conteúdo desta pasta para um repositório no GitHub (os arquivos na raiz).
 2. Em render.com: New → Web Service → escolha o repositório.
    Runtime: Node · Build Command: `echo ok` · Start Command: `node server.js` · Plano: Free.
-3. Em Environment, crie a variável `ADMIN_KEY` com uma senha só sua.
-4. Deploy. No jogo, digite no chat `/adm SUASENHA` para virar ADM.
+3. Em Environment, crie as variáveis:
+   - `ADMIN_KEY` — sua senha de ADM.
+   - `GITHUB_TOKEN` — (recomendado) token para guardar os dados de forma permanente. Veja abaixo.
+4. Deploy. No jogo, `/adm SUASENHA` no chat te dá poderes de ADM.
 
-Plano gratuito: o servidor dorme após 15 min sem jogadores (leva ~1 min para acordar) e a
-pasta `saves/` é apagada quando ele dorme ou reinicia (ranking e skins dadas pelo ADM somem;
-o progresso de cada jogador continua salvo no próprio navegador).
+## Painel ADM
+
+Abra `https://SEU-JOGO.onrender.com/admin` e entre com a `ADMIN_KEY`.
+
+- **Visão geral** — quem está online, aviso para todos, alertas de jogadores travados e de quedas no funil.
+- **Jogadores** — lista completa; clique num jogador para ver a linha do tempo dele e agir:
+  mensagem privada, curar, teleportar, dar ouro/XP/itens, expulsar, silenciar, banir, dar skins, anotações.
+- **Funil** — quantos jogadores chegam a cada missão da história e a cada faixa de nível; as maiores quedas ficam em vermelho.
+- **Missões** — tempo típico de cada missão (tempo de jogo ativo), mortes, quem está preso agora e quem largou o jogo nela.
+- **Onde saem** — jogadores que sumiram, agrupados pelo ponto onde pararam; onde as sessões costumam terminar; duração das sessões.
+- **Atividade** — horários em que entram, jogadores por dia, tempo por zona, o que mais fazem, monstros que mais matam.
+- **Linha do tempo** — todos os eventos, filtráveis por jogador e tipo.
+- **Chat** — histórico do chat com botão de silenciar.
+- **Servidor** — modo manutenção, mensagem de boas-vindas, banidos, onde os dados estão guardados, zerar estatísticas de teste.
+
+## Guardar os dados para sempre (grátis) com GITHUB_TOKEN
+
+O plano gratuito do Render apaga o disco quando o servidor dorme. Com um `GITHUB_TOKEN`, o servidor
+guarda saves, ranking, skins, bans e estatísticas num **Gist secreto** da sua conta do GitHub
+(salva a cada 90 s, quando o último jogador sai e quando o servidor desliga) e recarrega tudo ao ligar.
+
+1. GitHub → foto → **Settings** → **Developer settings** → **Personal access tokens** → **Tokens (classic)** → **Generate new token (classic)**.
+2. Nome: `aetheria`. Expiration: **No expiration**. Marque **somente** a permissão **gist**. Gere e copie o token.
+3. No Render: Environment → `GITHUB_TOKEN` = o token copiado → Save (o serviço reinicia sozinho).
+4. No painel ADM, o selo do topo deve mostrar "☁️ dados salvos no GitHub".
+
+O Gist aparece em gist.github.com com o nome "aetheria-online-data (nao apagar)".
